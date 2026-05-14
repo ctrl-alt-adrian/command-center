@@ -5,6 +5,7 @@
   let candidates = $state(data.candidates);
   let savingFile = $state<string | null>(null);
   let finalizing = $state(false);
+  let bulking = $state(false);
 
   const counts = $derived({
     total: candidates.length,
@@ -27,6 +28,26 @@
       }
     } finally {
       savingFile = null;
+    }
+  }
+
+  async function bulkApprovePending() {
+    if (bulking) return;
+    const n = counts.pending;
+    if (n === 0) return;
+    if (!confirm(`Approve all ${n} pending candidate(s)? Existing approvals/rejections are kept as-is.`)) return;
+    bulking = true;
+    try {
+      const res = await fetch(`/api/vault/staging/${data.taskId}/bulk`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "approve-pending" }),
+      });
+      if (res.ok) {
+        candidates = candidates.map((c) => (!c.status ? { ...c, status: "approved" } : c));
+      }
+    } finally {
+      bulking = false;
     }
   }
 
@@ -71,14 +92,26 @@
       <h2 class="text-2xl font-semibold mt-1">Staging review</h2>
       <p class="text-xs text-muted mt-1 font-mono">{data.taskId}</p>
     </div>
-    <button
-      class="px-4 py-2 bg-accent text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50"
-      disabled={finalizing || data.taskStatus !== "needs_review"}
-      onclick={finalize}
-      title={data.taskStatus !== "needs_review" ? `task is ${data.taskStatus}` : "approve task and run embed phase"}
-    >
-      {finalizing ? "embedding…" : "Embed approved"}
-    </button>
+    <div class="flex gap-2">
+      {#if counts.pending > 0}
+        <button
+          class="px-4 py-2 border border-ok/40 text-ok rounded text-sm font-medium hover:bg-ok/10 disabled:opacity-50"
+          disabled={bulking}
+          onclick={bulkApprovePending}
+          title="Mark every undecided candidate as approved"
+        >
+          {bulking ? "approving…" : `Approve all pending (${counts.pending})`}
+        </button>
+      {/if}
+      <button
+        class="px-4 py-2 bg-accent text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50"
+        disabled={finalizing || data.taskStatus !== "needs_review"}
+        onclick={finalize}
+        title={data.taskStatus !== "needs_review" ? `task is ${data.taskStatus}` : "approve task and run embed phase"}
+      >
+        {finalizing ? "embedding…" : "Embed approved"}
+      </button>
+    </div>
   </div>
 
   <section class="grid grid-cols-4 gap-3 text-sm">
