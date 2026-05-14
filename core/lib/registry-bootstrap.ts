@@ -8,6 +8,7 @@ import { competitorsPipeline } from "../../pipelines/competitors/pipeline.config
 import { redditPmfPipeline, redditPmfMetricsPipeline } from "../../pipelines/reddit-pmf/pipeline.config.ts";
 import { softwareFactoryHousekeepingPipeline } from "../../pipelines/software-factory/pipeline.config.ts";
 import { rolenextBugResolverPipeline } from "../../pipelines/rolenext/bug-resolver/pipeline.config.ts";
+import { personalBrandPipeline } from "../../pipelines/personal-brand/pipeline.config.ts";
 
 export function bootstrapPipelines(): void {
   registerPipeline(marketingPipeline);
@@ -17,4 +18,5 @@ export function bootstrapPipelines(): void {
   registerPipeline(redditPmfMetricsPipeline);
   registerPipeline(softwareFactoryHousekeepingPipeline);
   registerPipeline(rolenextBugResolverPipeline);
+  registerPipeline(personalBrandPipeline);
 }

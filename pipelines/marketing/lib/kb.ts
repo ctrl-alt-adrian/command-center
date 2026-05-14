@@ -19,6 +19,16 @@ async function readVaultNotes(): Promise<KBEntry[]> {
   return notes
     // Skip Map-of-Content stubs — they're indexes, not content
     .filter((n) => n.filename.toLowerCase() !== "map of content")
+    // Audience filter: marketing-product surfaces notes tagged audience: product
+    // or audience: both or untagged. Notes tagged audience: brand are reserved
+    // for the personal-brand pipeline.
+    .filter((n) => {
+      const audience =
+        typeof n.frontmatter.audience === "string"
+          ? (n.frontmatter.audience as string).toLowerCase()
+          : null;
+      return audience !== "brand";
+    })
     .map((n) => {
       const tier = typeof n.frontmatter.tier === "number" ? n.frontmatter.tier : 2;
       const contentReady = n.frontmatter.content_ready === true;
