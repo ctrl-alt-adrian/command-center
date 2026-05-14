@@ -12,6 +12,21 @@
     cleared_stale: "text-muted",
   };
 
+  // Marketing tasks carry draftDir + candidate context through their input chain.
+  // Surface them as a real action panel instead of forcing the captain to read JSON.
+  const marketingContext = $derived.by(() => {
+    if (t.pipelineId !== "marketing") return null;
+    const input = (t.input ?? {}) as Record<string, unknown>;
+    const candidate = (input.candidate ?? {}) as Record<string, unknown>;
+    const draftDir = typeof input.draftDir === "string" ? input.draftDir : null;
+    const hook = typeof candidate.hook === "string" ? candidate.hook : null;
+    const angle = typeof candidate.angle === "string" ? candidate.angle : null;
+    const candidateId = typeof candidate.id === "string" ? candidate.id : null;
+    const platforms = Array.isArray(input.platforms) ? (input.platforms as string[]) : null;
+    if (!draftDir && !hook && !angle) return null;
+    return { draftDir, hook, angle, candidateId, platforms };
+  });
+
   async function approve() {
     await fetch(`/api/tasks/${t.id}/approve`, { method: "POST" });
     location.reload();
@@ -88,6 +103,57 @@
   {#if t.error}
     <section class="bg-danger/10 border border-danger rounded p-3 text-sm">
       <strong class="text-danger">Error:</strong> {t.error}
+    </section>
+  {/if}
+
+  {#if marketingContext}
+    <section class="bg-card border border-border rounded p-4 space-y-3">
+      <div class="flex items-start justify-between gap-3">
+        <h3 class="text-sm font-medium text-muted uppercase tracking-wider">Marketing context</h3>
+        {#if marketingContext.draftDir}
+          <a
+            href={`/marketing/drafts/${marketingContext.draftDir}`}
+            class="text-xs px-3 py-1.5 rounded bg-accent text-background font-medium hover:opacity-90"
+          >
+            Open drafts editor →
+          </a>
+        {/if}
+      </div>
+      {#if marketingContext.hook}
+        <div>
+          <div class="text-xs text-muted uppercase tracking-wider mb-1">Hook</div>
+          <p class="text-sm">{marketingContext.hook}</p>
+        </div>
+      {/if}
+      {#if marketingContext.angle}
+        <div>
+          <div class="text-xs text-muted uppercase tracking-wider mb-1">Angle</div>
+          <p class="text-sm text-muted">{marketingContext.angle}</p>
+        </div>
+      {/if}
+      <div class="flex flex-wrap gap-3 text-xs text-muted pt-1">
+        {#if marketingContext.draftDir}
+          <span><span class="text-muted/70">slug:</span> <code class="font-mono">{marketingContext.draftDir}</code></span>
+        {/if}
+        {#if marketingContext.candidateId}
+          <span><span class="text-muted/70">source kb:</span> <code class="font-mono">{marketingContext.candidateId}</code></span>
+        {/if}
+        {#if marketingContext.platforms}
+          <span><span class="text-muted/70">platforms:</span> {marketingContext.platforms.join(", ")}</span>
+        {/if}
+      </div>
+      {#if t.phaseId === "review" && t.status === "needs_review"}
+        <p class="text-xs text-muted/80 pt-1 border-t border-border/40">
+          Open the drafts editor to read each platform's post, edit inline, refine with Claude, then
+          come back here and <strong class="text-ok">approve</strong> to mark the set as reviewed —
+          or <strong class="text-danger">reject</strong> if it shouldn't ship.
+        </p>
+      {:else if t.phaseId === "slop-check" && t.status === "needs_review"}
+        <p class="text-xs text-muted/80 pt-1 border-t border-border/40">
+          Slop gate failed retries. Open the drafts editor to inspect each platform's output and decide
+          whether to refine, regenerate, or reject from here.
+        </p>
+      {/if}
     </section>
   {/if}
 
