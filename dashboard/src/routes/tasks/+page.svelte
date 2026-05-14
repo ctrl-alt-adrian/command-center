@@ -1,6 +1,13 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
+
   let { data } = $props();
   let filter = $state<"all" | "pending" | "needs_review" | "failed" | "completed" | "paused_backpressure">("all");
+
+  $effect(() => {
+    const id = setInterval(() => invalidateAll(), 5000);
+    return () => clearInterval(id);
+  });
 
   const STATUS_COLORS: Record<string, string> = {
     pending: "text-foreground",
@@ -22,15 +29,15 @@
 
   async function approve(id: string) {
     await fetch(`/api/tasks/${id}/approve`, { method: "POST" });
-    location.reload();
+    await invalidateAll();
   }
   async function reject(id: string) {
     await fetch(`/api/tasks/${id}/reject`, { method: "POST" });
-    location.reload();
+    await invalidateAll();
   }
   async function remove(id: string) {
     await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-    location.reload();
+    await invalidateAll();
   }
   async function clearFailed(pipelineId?: string) {
     const scope = pipelineId ? `for ${pipelineId}` : "across every pipeline";
@@ -40,7 +47,7 @@
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: ["failed", "cleared_stale"], pipelineId }),
     });
-    location.reload();
+    await invalidateAll();
   }
   async function clearCompleted(pipelineId?: string) {
     const scope = pipelineId ? `for ${pipelineId}` : "across every pipeline";
@@ -50,11 +57,11 @@
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: ["completed"], pipelineId }),
     });
-    location.reload();
+    await invalidateAll();
   }
   async function runCron() {
     await fetch("/api/cron", { method: "POST" });
-    location.reload();
+    await invalidateAll();
   }
 
   const failedCount = $derived(data.tasks.filter((t) => t.status === "failed").length);

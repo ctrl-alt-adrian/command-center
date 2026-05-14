@@ -1,5 +1,12 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
+
   let { data } = $props();
+
+  $effect(() => {
+    const id = setInterval(() => invalidateAll(), 5000);
+    return () => clearInterval(id);
+  });
 </script>
 
 <div class="space-y-4">
