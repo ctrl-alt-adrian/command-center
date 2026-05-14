@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
   import { formatDate } from "$lib/format";
   let { data } = $props();
 
@@ -7,6 +8,11 @@
   let enabled = $state(new Set(data.enabledPlatforms));
   let savingPlatforms = $state(false);
   let running = $state(false);
+
+  $effect(() => {
+    const id = setInterval(() => invalidateAll(), 5000);
+    return () => clearInterval(id);
+  });
 
   async function togglePlatform(p: string) {
     if (savingPlatforms) return;

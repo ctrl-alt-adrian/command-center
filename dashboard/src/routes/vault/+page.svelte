@@ -1,7 +1,13 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
   import { formatDate } from "$lib/format";
   let { data } = $props();
   let running = $state(false);
+
+  $effect(() => {
+    const id = setInterval(() => invalidateAll(), 5000);
+    return () => clearInterval(id);
+  });
 
   async function clearFailed() {
     if (!confirm(`Remove ${data.failedCount} failed vault-nuggets task(s)? This is irreversible.`)) return;

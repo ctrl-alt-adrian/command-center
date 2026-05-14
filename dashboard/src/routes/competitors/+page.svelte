@@ -1,10 +1,16 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
   import { formatDate } from "$lib/format";
   let { data } = $props();
 
   type Tab = "top" | "outliers" | "niche" | "channels" | "shorts" | "archive";
   let tab = $state<Tab>("top");
   let running = $state(false);
+
+  $effect(() => {
+    const id = setInterval(() => invalidateAll(), 5000);
+    return () => clearInterval(id);
+  });
 
   async function clearFailed() {
     if (!confirm(`Remove ${data.failedCount} failed competitors task(s)? This is irreversible.`)) return;

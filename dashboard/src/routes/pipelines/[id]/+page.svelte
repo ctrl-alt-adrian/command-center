@@ -1,7 +1,13 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
   import { formatCron } from "$lib/format";
   let { data } = $props();
   const p = $derived(data.pipeline);
+
+  $effect(() => {
+    const id = setInterval(() => invalidateAll(), 5000);
+    return () => clearInterval(id);
+  });
 
   const GATE_DESC: Record<string, string> = {
     needs_review: "human approval required — task pauses here",
