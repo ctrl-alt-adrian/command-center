@@ -121,16 +121,20 @@
             {:else if c.status === "rejected"}
               <span class="text-xs px-2 py-1 rounded bg-danger/15 border border-danger/30 text-danger">rejected</span>
             {/if}
-            <button
-              class="text-xs px-2 py-1 rounded border border-ok/30 text-ok hover:bg-ok/10 disabled:opacity-40"
-              disabled={savingFile === c.file}
-              onclick={() => setStatus(c.file, "approved")}
-            >approve</button>
-            <button
-              class="text-xs px-2 py-1 rounded border border-danger/30 text-danger hover:bg-danger/10 disabled:opacity-40"
-              disabled={savingFile === c.file}
-              onclick={() => setStatus(c.file, "rejected")}
-            >reject</button>
+            {#if c.status !== "approved"}
+              <button
+                class="text-xs px-2 py-1 rounded border border-ok/30 text-ok hover:bg-ok/10 disabled:opacity-40"
+                disabled={savingFile === c.file}
+                onclick={() => setStatus(c.file, "approved")}
+              >approve</button>
+            {/if}
+            {#if c.status !== "rejected"}
+              <button
+                class="text-xs px-2 py-1 rounded border border-danger/30 text-danger hover:bg-danger/10 disabled:opacity-40"
+                disabled={savingFile === c.file}
+                onclick={() => setStatus(c.file, "rejected")}
+              >reject</button>
+            {/if}
           </div>
         </header>
 
