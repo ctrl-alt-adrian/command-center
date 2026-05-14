@@ -1,6 +1,6 @@
 import type { PipelineConfig, PhaseConfig, Task, PhaseContext } from "../../core/lib/types.ts";
 import { discoverContent, discoverFromCandidates, generateDrafts, type ContentCandidate } from "./lib/generate.ts";
-import { getKBEntries, markUsedForContent } from "./lib/kb.ts";
+import { getKBEntries, getKBEntry, markUsedForContent } from "./lib/kb.ts";
 import { runRules } from "../../core/lib/slop.ts";
 import { MARKETING_SLOP_PACK, loadMarketingSlopPack } from "./lib/slop-loader.ts";
 import { getDraftSet, updateDraftStatus } from "./lib/drafts.ts";
@@ -44,6 +44,20 @@ const discoveryPhase: PhaseConfig = {
 
     ctx.log("discovery produced candidates", { count: result.candidates.length });
     return { output: { candidates: result.candidates as unknown as Record<string, unknown>[], summary: result.summary as unknown as Record<string, unknown> } };
+  },
+  /**
+   * On approval, fan out one generate task per candidate. Each downstream
+   * task gets a single ScoredCandidate plus that candidate's KB context.
+   */
+  fanOut: async (task) => {
+    const candidates = (task.output?.candidates as ScoredCandidate[] | undefined) ?? [];
+    const out: Array<Record<string, unknown>> = [];
+    for (const candidate of candidates) {
+      const kbEntry = await getKBEntry(candidate.id).catch(() => null);
+      const kbContext = kbEntry?.body ?? "";
+      out.push({ candidate, kbContext });
+    }
+    return out;
   },
 };
 

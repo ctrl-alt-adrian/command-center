@@ -26,6 +26,13 @@ export interface PhaseConfig {
   retryPolicy?: RetryPolicy;
   check?: (task: Task) => Promise<GateCheckResult>;
   run?: (task: Task, ctx: PhaseContext) => Promise<PhaseOutput>;
+  /**
+   * Optional fan-out: when defined, on advance the processor creates one
+   * downstream task per element returned. Each element becomes the `input`
+   * of a new next-phase task (merged with this task's input + previousTaskId).
+   * Falls back to single-task advance when undefined.
+   */
+  fanOut?: (task: Task) => Promise<Array<Record<string, unknown>>>;
 }
 
 export interface PhaseOutput {

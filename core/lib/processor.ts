@@ -181,12 +181,37 @@ async function advanceOrComplete(pipeline: PipelineConfig, phase: PhaseConfig, t
     await logEvent("completed", { taskId: task.id, pipelineId: pipeline.id });
     return;
   }
-  // Create the next-phase task as a child.
   const fresh = await getTask(task.id);
+  const baseInput = { ...task.input, ...(fresh?.output ?? {}), previousTaskId: task.id };
+
+  if (phase.fanOut) {
+    const elements = await phase.fanOut(fresh ?? task);
+    if (elements.length === 0) {
+      await updateTask(task.id, { status: "completed" });
+      consoleLog("fanout_empty", { taskId: task.id, nextPhase: next });
+      await logEvent("fanout_empty", { taskId: task.id, nextPhase: next });
+      return;
+    }
+    for (const el of elements) {
+      await createTask({
+        pipelineId: pipeline.id,
+        phaseId: next,
+        input: { ...baseInput, ...el },
+        parentId: task.parentId ?? task.id,
+        status: "pending",
+      });
+    }
+    await updateTask(task.id, { status: "completed" });
+    consoleLog("fanned_out", { taskId: task.id, nextPhase: next, count: elements.length });
+    await logEvent("fanned_out", { taskId: task.id, nextPhase: next, count: elements.length });
+    return;
+  }
+
+  // Default: single next-phase task as a child.
   await createTask({
     pipelineId: pipeline.id,
     phaseId: next,
-    input: { ...task.input, ...(fresh?.output ?? {}), previousTaskId: task.id },
+    input: baseInput,
     parentId: task.parentId ?? task.id,
     status: "pending",
   });
