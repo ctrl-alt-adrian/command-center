@@ -17,3 +17,6 @@
 
 # Software-factory housekeeping — 3 AM daily.
 0 3 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"software-factory-housekeeping"}' > /dev/null 2>&1  # command-center software-factory housekeeping
+
+# RoleNext bug resolver — poll every 15 min for new GitHub issues + PR-revision activity.
+*/15 * * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"rolenext-bug-resolver"}' > /dev/null 2>&1  # command-center rolenext-bug-resolver poll

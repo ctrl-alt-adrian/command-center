@@ -7,6 +7,7 @@ import { vaultNuggetsPipeline } from "../../pipelines/vault-nuggets/pipeline.con
 import { competitorsPipeline } from "../../pipelines/competitors/pipeline.config.ts";
 import { redditPmfPipeline, redditPmfMetricsPipeline } from "../../pipelines/reddit-pmf/pipeline.config.ts";
 import { softwareFactoryHousekeepingPipeline } from "../../pipelines/software-factory/pipeline.config.ts";
+import { rolenextBugResolverPipeline } from "../../pipelines/rolenext/bug-resolver/pipeline.config.ts";
 
 export function bootstrapPipelines(): void {
   registerPipeline(marketingPipeline);
@@ -15,4 +16,5 @@ export function bootstrapPipelines(): void {
   registerPipeline(redditPmfPipeline);
   registerPipeline(redditPmfMetricsPipeline);
   registerPipeline(softwareFactoryHousekeepingPipeline);
+  registerPipeline(rolenextBugResolverPipeline);
 }
