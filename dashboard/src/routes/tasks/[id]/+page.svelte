@@ -157,30 +157,44 @@
     </section>
   {/if}
 
-  <section class="space-y-2">
-    <h3 class="text-sm font-medium text-muted uppercase tracking-wider">Input</h3>
-    <pre class="bg-card border border-border rounded p-3 text-xs overflow-x-auto">{JSON.stringify(t.input, null, 2)}</pre>
-  </section>
+  <details class="group">
+    <summary class="text-sm font-medium text-muted uppercase tracking-wider cursor-pointer hover:text-foreground list-none flex items-center gap-2">
+      <span class="text-xs transition-transform group-open:rotate-90">▶</span>
+      Input
+      <span class="text-xs text-muted/60 normal-case font-normal">(raw JSON)</span>
+    </summary>
+    <pre class="mt-2 bg-card border border-border rounded p-3 text-xs overflow-x-auto">{JSON.stringify(t.input, null, 2)}</pre>
+  </details>
 
   {#if t.output}
-    <section class="space-y-2">
-      <h3 class="text-sm font-medium text-muted uppercase tracking-wider">Output</h3>
-      <pre class="bg-card border border-border rounded p-3 text-xs overflow-x-auto">{JSON.stringify(t.output, null, 2)}</pre>
-    </section>
+    <details class="group">
+      <summary class="text-sm font-medium text-muted uppercase tracking-wider cursor-pointer hover:text-foreground list-none flex items-center gap-2">
+        <span class="text-xs transition-transform group-open:rotate-90">▶</span>
+        Output
+        <span class="text-xs text-muted/60 normal-case font-normal">(raw JSON)</span>
+      </summary>
+      <pre class="mt-2 bg-card border border-border rounded p-3 text-xs overflow-x-auto">{JSON.stringify(t.output, null, 2)}</pre>
+    </details>
   {/if}
 
   {#if data.phaseOutputs.length > 0}
-    <section class="space-y-2">
-      <h3 class="text-sm font-medium text-muted uppercase tracking-wider">Phase outputs (disk)</h3>
-      {#each data.phaseOutputs as po}
-        <div class="bg-card border border-border rounded p-3 space-y-2">
-          <div class="font-mono text-sm">{po.phaseId}</div>
-          {#if po.output}
-            <pre class="text-xs overflow-x-auto bg-sidebar p-2 rounded">{po.output}</pre>
-          {/if}
-        </div>
-      {/each}
-    </section>
+    <details class="group">
+      <summary class="text-sm font-medium text-muted uppercase tracking-wider cursor-pointer hover:text-foreground list-none flex items-center gap-2">
+        <span class="text-xs transition-transform group-open:rotate-90">▶</span>
+        Phase outputs (disk)
+        <span class="text-xs text-muted/60 normal-case font-normal">({data.phaseOutputs.length})</span>
+      </summary>
+      <div class="mt-2 space-y-2">
+        {#each data.phaseOutputs as po}
+          <div class="bg-card border border-border rounded p-3 space-y-2">
+            <div class="font-mono text-sm">{po.phaseId}</div>
+            {#if po.output}
+              <pre class="text-xs overflow-x-auto bg-sidebar p-2 rounded">{po.output}</pre>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    </details>
   {/if}
 
   {#if t.attempts.length > 0}
