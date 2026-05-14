@@ -18,7 +18,6 @@ core/lib/            # domain-agnostic runtime
   slop.ts            # rule-pack engine (rules pluggable per pipeline)
 
 pipelines/
-  test-pipeline/     # validates the core end-to-end (phase 1)
   marketing/         # phase 2
   vault-nuggets/     # phase 3
   competitors/       # phase 4

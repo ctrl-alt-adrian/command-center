@@ -56,14 +56,6 @@
     await fetch("/api/cron", { method: "POST" });
     location.reload();
   }
-  async function createTestTask() {
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pipelineId: "test-pipeline", input: { source: "manual" } }),
-    });
-    location.reload();
-  }
 
   const failedCount = $derived(data.tasks.filter((t) => t.status === "failed").length);
   const completedCount = $derived(data.tasks.filter((t) => t.status === "completed").length);
@@ -84,9 +76,6 @@
           clear completed ({completedCount})
         </button>
       {/if}
-      <button class="px-3 py-1.5 bg-card border border-border rounded hover:bg-sidebar text-sm" onclick={createTestTask}>
-        + test-pipeline task
-      </button>
       <button class="px-3 py-1.5 bg-accent text-background rounded text-sm font-medium" onclick={runCron}>
         run /api/cron
       </button>

@@ -28,4 +28,4 @@ echo
 echo "==> Done."
 echo "Next:"
 echo "  cd dashboard && npm run dev   # http://localhost:3001"
-echo "  curl -X POST http://localhost:3001/api/tasks -d '{\"pipelineId\":\"test-pipeline\"}'"
+echo "  Visit /tasks in the browser to monitor pipelines and trigger /api/cron."

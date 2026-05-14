@@ -2,7 +2,6 @@
 // core/lib/ does not import any pipeline-specific code other than through this file.
 
 import { registerPipeline } from "./registry.ts";
-import { testPipeline } from "../../pipelines/test-pipeline/pipeline.config.ts";
 import { marketingPipeline } from "../../pipelines/marketing/pipeline.config.ts";
 import { vaultNuggetsPipeline } from "../../pipelines/vault-nuggets/pipeline.config.ts";
 import { competitorsPipeline } from "../../pipelines/competitors/pipeline.config.ts";
@@ -10,7 +9,6 @@ import { redditPmfPipeline, redditPmfMetricsPipeline } from "../../pipelines/red
 import { softwareFactoryHousekeepingPipeline } from "../../pipelines/software-factory/pipeline.config.ts";
 
 export function bootstrapPipelines(): void {
-  registerPipeline(testPipeline);
   registerPipeline(marketingPipeline);
   registerPipeline(vaultNuggetsPipeline);
   registerPipeline(competitorsPipeline);
