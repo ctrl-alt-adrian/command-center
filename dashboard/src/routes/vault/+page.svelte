@@ -84,26 +84,57 @@
     </div>
   </div>
 
-  <section class="grid grid-cols-4 gap-3">
+  {#if data.runningExtract}
+    <section class="bg-accent/10 border border-accent/40 rounded p-4 text-sm flex items-center justify-between">
+      <div>
+        <strong class="text-accent">Extract running</strong>
+        <span class="text-muted ml-2">
+          started {new Date(data.runningExtract.startedAt).toLocaleTimeString()} — scanning sources via Haiku.
+          Candidates appear in "Pending review" once the scan completes (writes happen at the end).
+        </span>
+      </div>
+      <a href={`/tasks/${data.runningExtract.id}`} class="text-xs text-accent hover:underline">view task →</a>
+    </section>
+  {:else if data.totalNotes === 0 && data.pendingReview.length === 0}
+    <section class="bg-card border border-border rounded p-4 text-sm space-y-2">
+      <div class="text-foreground font-medium">Vault is empty</div>
+      <p class="text-muted text-xs leading-relaxed">
+        No atomic notes have been embedded yet. The <em>orphan wikilinks</em> count below is hidden in this state
+        because the only links present are placeholder <code class="font-mono">[[targets]]</code> in each pillar's
+        Map of Content stub — not broken cross-references between real notes.
+      </p>
+      <p class="text-muted text-xs leading-relaxed">
+        Press <strong>Run extract</strong> to scan rolenext sessions + build-journal via Haiku, dedupe against the
+        live vault, and stage candidate atomic notes for your review at <code class="font-mono">/vault/staging/&lt;task-id&gt;</code>.
+      </p>
+    </section>
+  {/if}
+
+  <section class="grid gap-3 {data.totalNotes > 0 ? 'grid-cols-4' : 'grid-cols-3'}">
     <div class="bg-card border border-border rounded p-3">
       <div class="text-xs text-muted">notes</div>
       <div class="text-2xl font-mono mt-1">{data.totalNotes}</div>
-      <div class="text-xs text-muted mt-1">across {data.pillars.length} pillars</div>
+      <div class="text-xs text-muted mt-1">atomic notes embedded across {data.pillars.length} pillars</div>
     </div>
-    <div class="bg-card border border-border rounded p-3">
-      <div class="text-xs text-muted">orphan wikilinks</div>
-      <div class="text-2xl font-mono mt-1 {data.orphanCount > 0 ? 'text-warn' : ''}">{data.orphanCount}</div>
-      <div class="text-xs text-muted mt-1">unresolved [[targets]]</div>
-    </div>
+    {#if data.totalNotes > 0}
+      <a
+        href="/vault/orphans"
+        class="bg-card border border-border rounded p-3 hover:border-accent transition-colors block"
+      >
+        <div class="text-xs text-muted">orphan wikilinks</div>
+        <div class="text-2xl font-mono mt-1 {data.orphanCount > 0 ? 'text-warn' : ''}">{data.orphanCount}</div>
+        <div class="text-xs text-muted mt-1">[[target]] pointers with no matching note — click to inspect</div>
+      </a>
+    {/if}
     <div class="bg-card border border-border rounded p-3">
       <div class="text-xs text-muted">pending review</div>
       <div class="text-2xl font-mono mt-1 {data.pendingReview.length > 0 ? 'text-warn' : ''}">{data.pendingReview.length}</div>
-      <div class="text-xs text-muted mt-1">extract task(s) awaiting captain</div>
+      <div class="text-xs text-muted mt-1">staged candidates awaiting your approve/reject</div>
     </div>
     <div class="bg-card border border-border rounded p-3">
       <div class="text-xs text-muted">total tasks</div>
       <div class="text-2xl font-mono mt-1">{data.taskCount}</div>
-      <div class="text-xs text-muted mt-1">all-time</div>
+      <div class="text-xs text-muted mt-1">all extract + embed runs (any status, all time)</div>
     </div>
   </section>
 

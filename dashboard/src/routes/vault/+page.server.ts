@@ -9,6 +9,8 @@ export async function load() {
     listTasksByPipeline("vault-nuggets"),
   ]);
 
+  const runningExtract = tasks.find((t) => t.status === "running" && t.phaseId === "extract");
+
   // Per-pillar counts
   const counts: Record<string, number> = {};
   const recentByPillar: Record<string, Array<{ filename: string; pillar: string; title: string; created: string }>> = {};
@@ -47,16 +49,20 @@ export async function load() {
     }),
   );
 
+  const totalNotes = notes.filter((n) => n.filename.toLowerCase() !== "map of content").length;
   return {
     pillars: PILLARS.map((p) => ({
       slug: p,
       count: counts[p],
       recent: recentByPillar[p],
     })),
-    totalNotes: notes.filter((n) => n.filename.toLowerCase() !== "map of content").length,
+    totalNotes,
     orphanCount: orphans.length,
     pendingReview: pendingDetails,
     taskCount: tasks.length,
     failedCount: tasks.filter((t) => t.status === "failed" || t.status === "cleared_stale").length,
+    runningExtract: runningExtract
+      ? { id: runningExtract.id, startedAt: runningExtract.createdAt }
+      : null,
   };
 }
