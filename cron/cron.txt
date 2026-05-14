@@ -14,3 +14,6 @@
 # Reddit PMF (Monday 8 AM weekly) + Friday metrics sweep. Uncomment to enable.
 # 0 8 * * 1 curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"reddit-pmf"}' > /dev/null 2>&1  # command-center reddit-pmf
 # 0 17 * * 5 curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"reddit-pmf-metrics"}' > /dev/null 2>&1  # command-center reddit-pmf-metrics
+
+# Software-factory housekeeping (3 AM daily). Safe to enable any time.
+# 0 3 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"software-factory-housekeeping"}' > /dev/null 2>&1  # command-center software-factory housekeeping
