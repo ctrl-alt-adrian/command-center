@@ -1,6 +1,7 @@
 import { listNotes, listOrphanLinks, PILLARS } from "../../../../core/lib/vault.ts";
 import { listTasksByPipeline } from "../../../../core/lib/tasks.ts";
 import { listStagedCandidates } from "../../../../pipelines/vault-nuggets/lib/extract.ts";
+import { VAULT_ROOT } from "../../../../core/lib/paths.ts";
 
 export async function load() {
   const [notes, orphans, tasks] = await Promise.all([
@@ -64,5 +65,6 @@ export async function load() {
     runningExtract: runningExtract
       ? { id: runningExtract.id, startedAt: runningExtract.createdAt }
       : null,
+    vaultRoot: VAULT_ROOT,
   };
 }

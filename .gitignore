@@ -23,6 +23,7 @@ logs/*
 # Vault content — phase 3 captures structure but personal notes stay local
 vault/*
 !vault/.gitkeep
+!vault/README.md
 
 # Marketing pipeline runtime
 pipelines/marketing/config.json

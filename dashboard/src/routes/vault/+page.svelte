@@ -29,6 +29,26 @@
     location.reload();
   }
 
+  let copiedPath = $state(false);
+  async function openInObsidian() {
+    // Obsidian's URL scheme: obsidian://open?path=<absolute-path>
+    // On Linux this only works if Obsidian's protocol handler is registered.
+    // If the browser doesn't navigate to it (no registered handler), fall back
+    // to copying the absolute path so the captain can paste it into File → Open vault.
+    const url = `obsidian://open?path=${encodeURIComponent(data.vaultRoot)}`;
+    window.location.href = url;
+    // Best-effort fallback: copy path to clipboard after a beat.
+    setTimeout(async () => {
+      try {
+        await navigator.clipboard.writeText(data.vaultRoot);
+        copiedPath = true;
+        setTimeout(() => (copiedPath = false), 3000);
+      } catch {
+        // clipboard blocked, no-op
+      }
+    }, 500);
+  }
+
   async function runExtract() {
     if (running) return;
     const ok = confirm(
@@ -66,6 +86,13 @@
       </p>
     </div>
     <div class="flex gap-2">
+      <button
+        class="px-3 py-2 border border-border text-muted rounded hover:bg-card text-sm"
+        onclick={openInObsidian}
+        title={`Opens obsidian://open?path=${data.vaultRoot}. If Obsidian's URL handler isn't registered on this machine, the absolute path is copied to your clipboard so you can paste it into File → Open vault.`}
+      >
+        {copiedPath ? "path copied" : "Open in Obsidian"}
+      </button>
       {#if data.failedCount > 0}
         <button class="px-3 py-2 border border-accent/40 text-accent rounded hover:bg-accent/10 text-sm" onclick={rerunFailed}>
           rerun failed ({data.failedCount})
