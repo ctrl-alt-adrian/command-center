@@ -4,3 +4,6 @@
 # Marketing pipeline. Uncomment to enable.
 # 0 10 * * * /home/adrian/Developer/projects/command-center/cron/fetch-signals.sh > /dev/null 2>&1  # command-center marketing signals
 # 0 11 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"marketing"}' > /dev/null 2>&1  # command-center marketing discovery
+
+# Vault nuggets. Uncomment to enable.
+# 0 9 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"vault-nuggets"}' > /dev/null 2>&1  # command-center vault-nuggets extract

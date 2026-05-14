@@ -75,17 +75,51 @@ function toKBEntry(filename: string, raw: string): KBEntry {
 }
 
 export async function getKBEntries(): Promise<KBEntry[]> {
+  const [legacy, vault] = await Promise.all([
+    readLegacySessions(),
+    readVaultNotes().catch(() => [] as KBEntry[]),
+  ]);
+  const merged = [...vault, ...legacy];
+  merged.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
+  return merged;
+}
+
+async function readLegacySessions(): Promise<KBEntry[]> {
   const files = await safeReaddir(KB_DIR);
   const mdFiles = files.filter((f) => f.endsWith(".md"));
-  const entries = await Promise.all(
+  return Promise.all(
     mdFiles.map(async (file) => {
       const raw = await fs.readFile(path.join(KB_DIR, file), "utf-8");
       return toKBEntry(file, raw);
     })
   );
+}
 
-  entries.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
-  return entries;
+async function readVaultNotes(): Promise<KBEntry[]> {
+  const { listNotes } = await import("../../../core/lib/vault.ts");
+  const notes = await listNotes();
+  return notes
+    // Skip Map-of-Content stubs — they're indexes, not content
+    .filter((n) => n.filename.toLowerCase() !== "map of content")
+    .map((n) => {
+      const tier = typeof n.frontmatter.tier === "number" ? n.frontmatter.tier : 2;
+      const contentReady = n.frontmatter.content_ready === true;
+      return {
+        id: `vault:${n.pillar}:${n.filename}`,
+        filename: n.relPath,
+        date: (n.frontmatter.created as string) ?? "",
+        project: String(n.pillar),
+        summary: (n.frontmatter.title as string) || n.summary,
+        tags: Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [],
+        contentAngles: [],
+        // Vault notes are pre-curated: tier-1 are framework notes, treat as shareworthy.
+        shareworthy: tier === 1,
+        usedForContent: false,
+        body: n.body,
+        contentWorthy: contentReady ? true : undefined,
+        contentType: undefined,
+      } as KBEntry;
+    });
 }
 
 export async function getKBEntry(id: string): Promise<KBEntry | null> {
