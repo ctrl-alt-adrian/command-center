@@ -6,7 +6,7 @@ import { diffAgainstMain, worktreePathFor } from "../lib/worktree.ts";
 import { scanWritePolicy, type SoftBanHit } from "../lib/verify/write-policy.ts";
 import { checkRegressionTests } from "../lib/verify/regression-test.ts";
 import { runMakeCi, type MakeCiResult } from "../lib/verify/make-ci.ts";
-import { appendAttemptFailure, readHandoff, writeHandoff } from "../lib/handoff.ts";
+import { appendAttemptFailure, handoffDirFromTask, readHandoff, writeHandoff } from "../lib/handoff.ts";
 import { runFix } from "../lib/fix-agent.ts";
 
 interface VerifyInput {
@@ -193,7 +193,9 @@ export async function runVerifyPhase(
   // remain, re-invoke the fix agent with the failure log appended to handoff, then
   // re-run all checks. Repeat up to `cfg.fixRetries` times.
   const attempts: AttemptRecord[] = [];
-  const handoffDir = path.resolve(ctx.outputDir, "..", "write-handoff");
+  // write-handoff ran on a prior task — derive its dir from input.handoffPath
+  // rather than computing relative to ctx.outputDir (which lives under a different task id).
+  const handoffDir = handoffDirFromTask(task);
   // Note: `cfg.fixRetries` counts ADDITIONAL fix attempts beyond the initial one.
   // attempt 1 = initial fix (already done in fix phase). retries 1..fixRetries = more.
   const maxAttempts = 1 + Math.max(0, cfg.fixRetries);

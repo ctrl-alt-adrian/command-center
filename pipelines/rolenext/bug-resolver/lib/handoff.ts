@@ -1,6 +1,29 @@
 import fs from "fs/promises";
 import path from "path";
+import type { Task } from "../../../../core/lib/types.ts";
 import type { InvestigateOutcome, InvestigateResult } from "./investigate-agent.ts";
+
+/**
+ * Resolve the directory holding `handoff.md` for the given downstream task.
+ *
+ * The bug-resolver chains its phases across separate tasks (poll-issues →
+ * triage → write-handoff → fix → verify → pr → post-mortem). The write-handoff
+ * phase writes `handoff.md` into its OWN task's output dir and stores the
+ * absolute path on the next task's input as `handoffPath`. Every subsequent
+ * phase reads through this helper so they don't reinvent the (path-fragile,
+ * task-id-blind) "../write-handoff" relative lookup that broke fix.ts.
+ */
+export function handoffDirFromTask(task: Task): string {
+  const input = task.input as Record<string, unknown>;
+  const handoffPath = typeof input.handoffPath === "string" ? input.handoffPath : null;
+  if (!handoffPath) {
+    throw new Error(
+      `handoffDirFromTask: task ${task.id} (phase ${task.phaseId}) has no input.handoffPath — ` +
+        `write-handoff phase output should have propagated it via advanceOrComplete's input merge`,
+    );
+  }
+  return path.dirname(handoffPath);
+}
 
 export interface HandoffInput {
   issueNumber: number;

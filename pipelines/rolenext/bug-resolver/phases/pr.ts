@@ -6,7 +6,7 @@ import { branchNameFor, worktreePathFor } from "../lib/worktree.ts";
 import { createPR, prDraft, commentOnPR } from "../lib/github.ts";
 import { buildPrBody, buildPrTitle, deriveArea, pushBranch } from "../lib/pr.ts";
 import { upsertFingerprint } from "../lib/state.ts";
-import { readHandoff } from "../lib/handoff.ts";
+import { handoffDirFromTask, readHandoff } from "../lib/handoff.ts";
 import type { SoftBanHit } from "../lib/verify/write-policy.ts";
 
 interface PrInput {
@@ -98,8 +98,9 @@ export async function runPrPhase(
   const branch = branchNameFor(input.issueNumber);
   const worktreePath = worktreePathFor(cfg.worktreeBase, input.issueNumber);
 
-  // Read handoff for the PR body.
-  const handoffDir = path.resolve(ctx.outputDir, "..", "write-handoff");
+  // Read handoff for the PR body. write-handoff ran on a prior task — pull
+  // its dir from input.handoffPath rather than the wrong relative path.
+  const handoffDir = handoffDirFromTask(task);
   const handoffBody = (await readHandoff(handoffDir)) ?? "_handoff not found_";
 
   // Pull root cause + proposed fix from investigate (carried in input via processor merge).

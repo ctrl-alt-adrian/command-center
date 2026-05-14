@@ -8,6 +8,7 @@ import { ROLENEXT_BUG_RESOLVER_CONFIG, type RolenextBugResolverConfig } from "..
 import { createWorktree, worktreePathFor, branchNameFor } from "../lib/worktree.ts";
 import { runFix, runFixRevision } from "../lib/fix-agent.ts";
 import { getPRComments, getPR, type GitHubReviewComment } from "../lib/github.ts";
+import { handoffDirFromTask } from "../lib/handoff.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -161,7 +162,10 @@ export async function runFixPhase(
   }
 
   // --- open mode (default) ---
-  const handoffPath = path.join(ctx.inputDir, "handoff.md");
+  // write-handoff ran on a prior task; its absolute path lives on this task's
+  // input as `handoffPath`. ctx.inputDir would resolve to <current-task>/<prev-phase>/
+  // which doesn't exist when phases chain across tasks.
+  const handoffPath = path.join(handoffDirFromTask(task), "handoff.md");
   const handoffBody = await fs.readFile(handoffPath, "utf-8");
   const worktreePath = await createWorktree(cfg.rolenextPath, cfg.worktreeBase, input.issueNumber);
 

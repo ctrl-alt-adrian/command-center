@@ -5,7 +5,7 @@ import type { PhaseContext, PhaseOutput, Task } from "../../../../core/lib/types
 import { getTask } from "../../../../core/lib/tasks.ts";
 import { removeWorktree } from "../lib/worktree.ts";
 import { ROLENEXT_BUG_RESOLVER_CONFIG, type RolenextBugResolverConfig } from "../pipeline.config.ts";
-import { readHandoff } from "../lib/handoff.ts";
+import { handoffDirFromTask, readHandoff } from "../lib/handoff.ts";
 import { buildAndWritePostMortem } from "../lib/post-mortem.ts";
 import type { InvestigateOutcome } from "../lib/investigate-agent.ts";
 import { upsertFingerprint } from "../lib/state.ts";
@@ -48,7 +48,9 @@ export async function runPostMortemPhase(
 ): Promise<PhaseOutput> {
   const input = task.input as unknown as PostMortemInput;
 
-  const handoffDir = path.resolve(ctx.outputDir, "..", "write-handoff");
+  // write-handoff ran on a prior task — pull its dir from input.handoffPath
+  // rather than the wrong relative path.
+  const handoffDir = handoffDirFromTask(task);
   const handoffBody = (await readHandoff(handoffDir)) ?? "";
 
   // Pull the parent task to get a stable createdAt (post-mortem task's createdAt
