@@ -30,6 +30,16 @@
     }
   }
 
+  async function clearFailed() {
+    if (!confirm(`Remove ${data.failedCount} failed marketing task(s)? This is irreversible.`)) return;
+    await fetch("/api/tasks/clear", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: ["failed", "cleared_stale"], pipelineId: "marketing" }),
+    });
+    location.reload();
+  }
+
   async function runDiscovery() {
     if (running) return;
     const ok = confirm(
@@ -78,6 +88,12 @@
         <a href="/pipelines/marketing" class="text-accent hover:underline">full DAG</a>
       </p>
     </div>
+    <div class="flex gap-2">
+    {#if data.failedCount > 0}
+      <button class="px-3 py-2 border border-danger/40 text-danger rounded hover:bg-danger/10 text-sm" onclick={clearFailed}>
+        clear failed ({data.failedCount})
+      </button>
+    {/if}
     <button
       class="px-4 py-2 bg-accent text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50"
       disabled={running || enabled.size === 0}
@@ -86,6 +102,7 @@
     >
       {running ? "starting…" : "Run discovery"}
     </button>
+    </div>
   </div>
 
   <section class="grid grid-cols-3 gap-3">

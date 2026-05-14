@@ -57,5 +57,6 @@ export async function load() {
     orphanCount: orphans.length,
     pendingReview: pendingDetails,
     taskCount: tasks.length,
+    failedCount: tasks.filter((t) => t.status === "failed" || t.status === "cleared_stale").length,
   };
 }

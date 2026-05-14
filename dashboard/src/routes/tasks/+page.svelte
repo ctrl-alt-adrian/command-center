@@ -28,6 +28,30 @@
     await fetch(`/api/tasks/${id}/reject`, { method: "POST" });
     location.reload();
   }
+  async function remove(id: string) {
+    await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+    location.reload();
+  }
+  async function clearFailed(pipelineId?: string) {
+    const scope = pipelineId ? `for ${pipelineId}` : "across every pipeline";
+    if (!confirm(`Remove every failed task ${scope}? This is irreversible.`)) return;
+    await fetch("/api/tasks/clear", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: ["failed", "cleared_stale"], pipelineId }),
+    });
+    location.reload();
+  }
+  async function clearCompleted(pipelineId?: string) {
+    const scope = pipelineId ? `for ${pipelineId}` : "across every pipeline";
+    if (!confirm(`Remove every completed task ${scope}?`)) return;
+    await fetch("/api/tasks/clear", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: ["completed"], pipelineId }),
+    });
+    location.reload();
+  }
   async function runCron() {
     await fetch("/api/cron", { method: "POST" });
     location.reload();
@@ -40,12 +64,26 @@
     });
     location.reload();
   }
+
+  const failedCount = $derived(data.tasks.filter((t) => t.status === "failed").length);
+  const completedCount = $derived(data.tasks.filter((t) => t.status === "completed").length);
+  const removable = (s: string) => s === "failed" || s === "completed" || s === "cleared_stale";
 </script>
 
 <div class="space-y-6">
   <div class="flex items-center justify-between">
     <h2 class="text-2xl font-semibold">Tasks</h2>
     <div class="flex gap-2">
+      {#if failedCount > 0}
+        <button class="px-3 py-1.5 border border-danger/40 text-danger rounded hover:bg-danger/10 text-sm" onclick={() => clearFailed()}>
+          clear failed ({failedCount})
+        </button>
+      {/if}
+      {#if completedCount > 0}
+        <button class="px-3 py-1.5 border border-border text-muted rounded hover:bg-card text-sm" onclick={() => clearCompleted()}>
+          clear completed ({completedCount})
+        </button>
+      {/if}
       <button class="px-3 py-1.5 bg-card border border-border rounded hover:bg-sidebar text-sm" onclick={createTestTask}>
         + test-pipeline task
       </button>
@@ -73,11 +111,15 @@
     <h3 class="text-sm font-medium text-muted uppercase tracking-wider">Pipelines</h3>
     <div class="grid grid-cols-2 gap-3">
       {#each data.pipelines as p}
-        <a
-          href={`/pipelines/${p.id}`}
-          class="bg-card border border-border rounded p-3 text-sm hover:border-accent transition-colors"
-        >
-          <div class="font-mono">{p.id}</div>
+        <div class="bg-card border border-border rounded p-3 text-sm hover:border-accent transition-colors">
+          <div class="flex items-baseline justify-between">
+            <a href={`/pipelines/${p.id}`} class="font-mono hover:text-accent">{p.id}</a>
+            {#if p.counts.failed > 0}
+              <button class="text-xs text-danger hover:underline" onclick={() => clearFailed(p.id)}>
+                clear failed ({p.counts.failed})
+              </button>
+            {/if}
+          </div>
           <div class="mt-2 grid grid-cols-3 gap-1 text-xs text-muted">
             <span>pending: {p.counts.pending}</span>
             <span>running: {p.counts.running}</span>
@@ -86,7 +128,7 @@
             <span class="text-danger">failed: {p.counts.failed}</span>
             <span class="text-danger">paused: {p.counts.paused_backpressure ?? 0}</span>
           </div>
-        </a>
+        </div>
       {/each}
     </div>
   </section>
@@ -143,7 +185,10 @@
             <td class="py-2 pr-2 whitespace-nowrap">
               {#if t.status === "needs_review"}
                 <button class="text-ok text-xs mr-2" onclick={() => approve(t.id)}>approve</button>
-                <button class="text-danger text-xs" onclick={() => reject(t.id)}>reject</button>
+                <button class="text-danger text-xs mr-2" onclick={() => reject(t.id)}>reject</button>
+              {/if}
+              {#if removable(t.status)}
+                <button class="text-muted hover:text-danger text-xs" onclick={() => remove(t.id)} title="Remove task">remove</button>
               {/if}
             </td>
           </tr>

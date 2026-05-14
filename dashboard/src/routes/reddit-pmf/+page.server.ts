@@ -66,6 +66,7 @@ export async function load() {
     awaitingPlacement: awaitingPlacement.map((h) => ({ id: h.id, name: h.cluster.name, deployUrl: h.deployUrl })),
     runningTasks: tasks.filter((t) => t.status === "running" || t.status === "pending").length,
     lastTaskAt: tasks[0]?.updatedAt ?? null,
+    failedCount: tasks.filter((t) => t.status === "failed" || t.status === "cleared_stale").length,
     deployMode: process.env.VERCEL_TOKEN && process.env.VERCEL_PROJECT_ID && process.env.LANDING_REPO_PATH ? "vercel" : "dry_run",
   };
 }

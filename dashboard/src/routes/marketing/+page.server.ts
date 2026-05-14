@@ -37,6 +37,7 @@ export async function load() {
     disabledPlatforms: platforms.disabled as string[],
     taskCount: tasks.length,
     needsReview: tasks.filter((t) => t.status === "needs_review").length,
+    failedCount: tasks.filter((t) => t.status === "failed").length,
     recentTasks,
     phases,
   };

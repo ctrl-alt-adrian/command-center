@@ -3,6 +3,16 @@
   let { data } = $props();
   let running = $state(false);
 
+  async function clearFailed() {
+    if (!confirm(`Remove ${data.failedCount} failed reddit-pmf task(s)? This is irreversible.`)) return;
+    await fetch("/api/tasks/clear", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: ["failed", "cleared_stale"], pipelineId: "reddit-pmf" }),
+    });
+    location.reload();
+  }
+
   async function runWeek() {
     if (running) return;
     const ok = confirm(
@@ -47,13 +57,20 @@
         <a href="/pipelines/reddit-pmf" class="text-accent hover:underline">pipeline</a>
       </p>
     </div>
-    <button
-      class="px-4 py-2 bg-accent text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50"
-      disabled={running}
-      onclick={runWeek}
-    >
-      {running ? "starting…" : "Run this week"}
-    </button>
+    <div class="flex gap-2">
+      {#if data.failedCount > 0}
+        <button class="px-3 py-2 border border-danger/40 text-danger rounded hover:bg-danger/10 text-sm" onclick={clearFailed}>
+          clear failed ({data.failedCount})
+        </button>
+      {/if}
+      <button
+        class="px-4 py-2 bg-accent text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50"
+        disabled={running}
+        onclick={runWeek}
+      >
+        {running ? "starting…" : "Run this week"}
+      </button>
+    </div>
   </div>
 
   {#if data.deployMode === "dry_run"}

@@ -1,19 +1,19 @@
 # command-center cron entries. Managed by setup.sh — lines matching 'command-center' are replaced on install.
 */5 * * * * curl -s -X POST http://localhost:3001/api/cron > /dev/null 2>&1  # command-center processor
 
-# Marketing pipeline. Uncomment to enable.
+# Marketing pipeline. Still manual on command-center; marketing-pipeline at :3000 still owns these slots.
 # 0 10 * * * /home/adrian/Developer/projects/command-center/cron/fetch-signals.sh > /dev/null 2>&1  # command-center marketing signals
 # 0 11 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"marketing"}' > /dev/null 2>&1  # command-center marketing discovery
 
-# Vault nuggets. Uncomment to enable.
-# 0 9 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"vault-nuggets"}' > /dev/null 2>&1  # command-center vault-nuggets extract
+# Vault nuggets — 9 AM daily.
+0 9 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"vault-nuggets"}' > /dev/null 2>&1  # command-center vault-nuggets extract
 
-# Competitors scrape (yt-dlp). Uncomment to enable.
-# 0 10 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"competitors"}' > /dev/null 2>&1  # command-center competitors scrape
+# Competitors scrape (yt-dlp) — 10 AM daily.
+0 10 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"competitors"}' > /dev/null 2>&1  # command-center competitors scrape
 
-# Reddit PMF (Monday 8 AM weekly) + Friday metrics sweep. Uncomment to enable.
-# 0 8 * * 1 curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"reddit-pmf"}' > /dev/null 2>&1  # command-center reddit-pmf
-# 0 17 * * 5 curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"reddit-pmf-metrics"}' > /dev/null 2>&1  # command-center reddit-pmf-metrics
+# Reddit PMF — Monday 8 AM weekly + Friday 5 PM metrics sweep.
+0 8 * * 1 curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"reddit-pmf"}' > /dev/null 2>&1  # command-center reddit-pmf
+0 17 * * 5 curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"reddit-pmf-metrics"}' > /dev/null 2>&1  # command-center reddit-pmf-metrics
 
-# Software-factory housekeeping (3 AM daily). Safe to enable any time.
-# 0 3 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"software-factory-housekeeping"}' > /dev/null 2>&1  # command-center software-factory housekeeping
+# Software-factory housekeeping — 3 AM daily.
+0 3 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"software-factory-housekeeping"}' > /dev/null 2>&1  # command-center software-factory housekeeping

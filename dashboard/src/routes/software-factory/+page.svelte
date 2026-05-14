@@ -3,6 +3,16 @@
   let { data } = $props();
   let running = $state(false);
 
+  async function clearFailed() {
+    if (!confirm(`Remove ${data.failedCount} failed software-factory task(s)? This is irreversible.`)) return;
+    await fetch("/api/tasks/clear", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: ["failed", "cleared_stale"], pipelineId: "software-factory-housekeeping" }),
+    });
+    location.reload();
+  }
+
   async function runHousekeeping() {
     if (running) return;
     running = true;
@@ -42,13 +52,20 @@
         and the <code>pipelines/software-factory/README.md</code> for the add-a-pipeline pattern.
       </p>
     </div>
-    <button
-      class="px-4 py-2 bg-accent text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50"
-      disabled={running}
-      onclick={runHousekeeping}
-    >
-      {running ? "starting…" : "Run housekeeping"}
-    </button>
+    <div class="flex gap-2">
+      {#if data.failedCount > 0}
+        <button class="px-3 py-2 border border-danger/40 text-danger rounded hover:bg-danger/10 text-sm" onclick={clearFailed}>
+          clear failed ({data.failedCount})
+        </button>
+      {/if}
+      <button
+        class="px-4 py-2 bg-accent text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50"
+        disabled={running}
+        onclick={runHousekeeping}
+      >
+        {running ? "starting…" : "Run housekeeping"}
+      </button>
+    </div>
   </div>
 
   <section class="space-y-2">

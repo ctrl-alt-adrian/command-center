@@ -20,6 +20,12 @@
     await fetch(`/api/tasks/${t.id}/reject`, { method: "POST" });
     location.reload();
   }
+  async function remove() {
+    if (!confirm(`Delete task ${t.id}? This is irreversible.`)) return;
+    await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
+    location.href = "/tasks";
+  }
+  const removable = $derived(t.status === "failed" || t.status === "completed" || t.status === "cleared_stale");
 </script>
 
 <div class="space-y-6">
@@ -35,12 +41,17 @@
     </div>
   </div>
 
-  {#if t.status === "needs_review"}
-    <div class="flex gap-2">
+  <div class="flex gap-2">
+    {#if t.status === "needs_review"}
       <button class="px-3 py-1.5 bg-ok/20 border border-ok text-ok rounded text-sm" onclick={approve}>approve</button>
       <button class="px-3 py-1.5 bg-danger/20 border border-danger text-danger rounded text-sm" onclick={reject}>reject</button>
-    </div>
-  {/if}
+    {/if}
+    {#if removable}
+      <button class="px-3 py-1.5 border border-danger/40 text-danger rounded hover:bg-danger/10 text-sm" onclick={remove}>
+        delete task
+      </button>
+    {/if}
+  </div>
 
   <section class="grid grid-cols-4 gap-2 text-sm">
     <div class="bg-card border border-border rounded p-3">
