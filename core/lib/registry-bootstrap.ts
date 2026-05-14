@@ -6,12 +6,14 @@ import { testPipeline } from "../../pipelines/test-pipeline/pipeline.config.ts";
 import { marketingPipeline } from "../../pipelines/marketing/pipeline.config.ts";
 import { vaultNuggetsPipeline } from "../../pipelines/vault-nuggets/pipeline.config.ts";
 import { competitorsPipeline } from "../../pipelines/competitors/pipeline.config.ts";
+import { redditPmfPipeline, redditPmfMetricsPipeline } from "../../pipelines/reddit-pmf/pipeline.config.ts";
 
 export function bootstrapPipelines(): void {
   registerPipeline(testPipeline);
   registerPipeline(marketingPipeline);
   registerPipeline(vaultNuggetsPipeline);
   registerPipeline(competitorsPipeline);
-  // Phase 5: registerPipeline(redditPmfPipeline); registerPipeline(redditPmfMetricsPipeline);
+  registerPipeline(redditPmfPipeline);
+  registerPipeline(redditPmfMetricsPipeline);
   // Phase 6: registerPipeline(softwareFactoryHousekeepingPipeline);
 }

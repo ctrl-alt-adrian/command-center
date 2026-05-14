@@ -1,0 +1,108 @@
+# Slop rules tuned for Reddit-native voice. Stricter than the marketing pack —
+# Reddit users sniff out AI tells in milliseconds. Any flagged-as-fail rule
+# triggers an intra-phase retry in the extract phase (up to slop_max_retries).
+
+banned_patterns:
+  - pattern: "\\u2014"
+    description: "Em dash. Reddit doesn't use them. Comma, period, or parenthetical."
+    severity: fail
+
+  # AI tells — common in claude/gpt outputs
+  - pattern: "\\bdelve\\b"
+    description: "AI tell"
+    severity: fail
+  - pattern: "\\btapestry\\b"
+    description: "AI tell"
+    severity: fail
+  - pattern: "\\bleverage\\b"
+    description: "Corporate filler"
+    severity: fail
+  - pattern: "\\bseamless(ly)?\\b"
+    description: "AI tell"
+    severity: fail
+  - pattern: "\\brobust\\b"
+    description: "AI tell"
+    severity: fail
+  - pattern: "\\bunlock\\b"
+    description: "AI tell"
+    severity: fail
+  - pattern: "\\bempowering\\b"
+    description: "AI tell"
+    severity: fail
+  - pattern: "\\bfostering\\b"
+    description: "AI tell"
+    severity: fail
+  - pattern: "\\bcutting.?edge\\b"
+    description: "Cliche"
+    severity: fail
+  - pattern: "\\bgame.?changer\\b"
+    description: "Cliche"
+    severity: fail
+
+  # LinkedIn-ese
+  - pattern: "\\bsynergy\\b"
+    description: "Corporate filler"
+    severity: fail
+  - pattern: "\\bparadigm shift\\b"
+    description: "Corporate filler"
+    severity: fail
+  - pattern: "\\bthought leader\\b"
+    description: "Corporate filler"
+    severity: fail
+  - pattern: "\\bmove the needle\\b"
+    description: "Corporate filler"
+    severity: fail
+  - pattern: "\\bdeep dive\\b"
+    description: "Corporate filler"
+    severity: fail
+  - pattern: "\\blow.hanging fruit\\b"
+    description: "Corporate filler"
+    severity: fail
+
+  # AI openers
+  - pattern: "(?i)here'?s the thing"
+    description: "AI opener"
+    severity: fail
+  - pattern: "(?i)let me (tell you|explain|break it down)"
+    description: "AI opener"
+    severity: fail
+  - pattern: "(?i)i'?ve been thinking"
+    description: "AI opener"
+    severity: fail
+  - pattern: "(?i)let'?s dive in"
+    description: "AI opener"
+    severity: fail
+  - pattern: "(?i)without further ado"
+    description: "AI opener"
+    severity: fail
+
+  # Two-word dramatic and engagement bait
+  - pattern: "\\bperiod\\.\\s*$"
+    description: "Two-word dramatic"
+    severity: fail
+  - pattern: "(?i)drop the mic"
+    description: "Two-word dramatic"
+    severity: fail
+  - pattern: "(?i)let that sink in"
+    description: "Two-word dramatic"
+    severity: fail
+  - pattern: "(?i)what do you think\\?"
+    description: "Engagement bait"
+    severity: fail
+  - pattern: "(?i)have you experienced this\\?"
+    description: "Engagement bait"
+    severity: fail
+  - pattern: "(?i)agree or disagree\\?"
+    description: "Engagement bait"
+    severity: fail
+  - pattern: "(?i)drop a .{1,20} in the comments"
+    description: "Engagement bait"
+    severity: fail
+
+  # Generic openers reddit users hate
+  - pattern: "(?i)in today'?s (world|landscape|environment)"
+    description: "Generic AI opener"
+    severity: fail
+  - pattern: "(?i)it'?s worth noting that"
+    description: "Hedging filler"
+    severity: fail

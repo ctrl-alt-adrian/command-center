@@ -1,0 +1,20 @@
+# Subreddits scraped weekly. Each entry: name (no /r/ prefix), label, optional flair filter.
+# Top 50 posts of the past week pulled per sub.
+
+subreddits:
+  - name: cscareerquestions
+    label: "Tech career questions"
+  - name: EngineeringResumes
+    label: "Resume review"
+  - name: recruitinghell
+    label: "Recruiting hell"
+  - name: csMajors
+    label: "CS majors"
+  - name: jobs
+    label: "Job search (general)"
+
+  # Optional adds — uncomment when ready:
+  # - name: layoffs
+  #   label: "Laid-off SWE angle"
+  # - name: ExperiencedDevs
+  #   label: "Senior engineer perspective"

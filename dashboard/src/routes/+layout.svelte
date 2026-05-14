@@ -12,7 +12,8 @@
     <a href="/marketing" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Marketing</a>
     <a href="/vault" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Vault</a>
     <a href="/competitors" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Competitors</a>
-    <div class="mt-auto text-xs text-muted px-3">phase 4 · port 3001</div>
+    <a href="/reddit-pmf" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Reddit PMF</a>
+    <div class="mt-auto text-xs text-muted px-3">phase 5 · port 3001</div>
   </aside>
   <main class="flex-1 p-6">
     {@render children()}

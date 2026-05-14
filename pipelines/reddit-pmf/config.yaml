@@ -1,0 +1,26 @@
+# Reddit-PMF pipeline config
+
+scrape:
+  # Top N posts per week per subreddit
+  posts_per_subreddit: 50
+  # Timeframe for "top" — week | month | day
+  timeframe: week
+  # Public JSON user-agent — Reddit requires a descriptive UA. Override via REDDIT_USER_AGENT.
+  default_user_agent: "command-center-reddit-pmf/0.1 (by /u/your-handle)"
+
+extract:
+  # Target cluster count
+  min_clusters: 3
+  max_clusters: 7
+  target_clusters: 5
+  # Intra-phase slop retry max
+  slop_max_retries: 3
+  # Sonnet for clustering (richer reasoning)
+  model: "claude-sonnet-4-6"
+
+deploy:
+  # Dry-run writes content files to signals/reddit-pmf/<date>/<cluster>/ without
+  # pushing to Vercel. The phase auto-detects mode: if VERCEL_TOKEN and
+  # VERCEL_PROJECT_ID are set, it attempts a deploy; otherwise dry-run.
+  # Set to `true` to force dry-run even when env vars are present.
+  force_dry_run: false
