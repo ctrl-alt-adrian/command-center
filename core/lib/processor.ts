@@ -307,6 +307,23 @@ export async function rejectTask(id: string, reason?: string): Promise<Task | nu
   return await getTask(id);
 }
 
+/** Re-queue a failed task: flip status back to pending, clear the error,
+ *  reset the retry counter so the phase's retryPolicy starts fresh. The
+ *  `attempts` history is preserved so prior failures stay visible. */
+export async function rerunTask(id: string): Promise<Task | null> {
+  const task = await getTask(id);
+  if (!task || task.status !== "failed") return null;
+  await updateTask(task.id, {
+    status: "pending",
+    error: "",
+    retryCount: 0,
+    gateFailReason: "",
+  });
+  consoleLog("rerun", { taskId: id, pipelineId: task.pipelineId, phaseId: task.phaseId });
+  await logEvent("rerun", { taskId: id, pipelineId: task.pipelineId, phaseId: task.phaseId });
+  return await getTask(id);
+}
+
 export async function pipelineStatus(): Promise<
   Array<{ id: string; phases: { id: string; gateType: string }[]; backpressureCap: number; counts: Record<string, number> }>
 > {

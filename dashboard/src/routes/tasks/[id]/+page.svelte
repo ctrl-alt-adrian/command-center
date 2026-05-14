@@ -25,6 +25,10 @@
     await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
     location.href = "/tasks";
   }
+  async function rerun() {
+    await fetch(`/api/tasks/${t.id}/rerun`, { method: "POST" });
+    location.reload();
+  }
   const removable = $derived(t.status === "failed" || t.status === "completed" || t.status === "cleared_stale");
 </script>
 
@@ -45,6 +49,9 @@
     {#if t.status === "needs_review"}
       <button class="px-3 py-1.5 bg-ok/20 border border-ok text-ok rounded text-sm" onclick={approve}>approve</button>
       <button class="px-3 py-1.5 bg-danger/20 border border-danger text-danger rounded text-sm" onclick={reject}>reject</button>
+    {/if}
+    {#if t.status === "failed"}
+      <button class="px-3 py-1.5 bg-accent/20 border border-accent text-accent rounded text-sm" onclick={rerun}>rerun</button>
     {/if}
     {#if removable}
       <button class="px-3 py-1.5 border border-danger/40 text-danger rounded hover:bg-danger/10 text-sm" onclick={remove}>

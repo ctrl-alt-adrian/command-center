@@ -39,6 +39,20 @@
     await fetch(`/api/tasks/${id}`, { method: "DELETE" });
     await invalidateAll();
   }
+  async function rerun(id: string) {
+    await fetch(`/api/tasks/${id}/rerun`, { method: "POST" });
+    await invalidateAll();
+  }
+  async function rerunFailed(pipelineId?: string) {
+    const scope = pipelineId ? `for ${pipelineId}` : "across every pipeline";
+    if (!confirm(`Re-queue every failed task ${scope}?`)) return;
+    await fetch("/api/tasks/rerun", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pipelineId }),
+    });
+    await invalidateAll();
+  }
   async function clearFailed(pipelineId?: string) {
     const scope = pipelineId ? `for ${pipelineId}` : "across every pipeline";
     if (!confirm(`Remove every failed task ${scope}? This is irreversible.`)) return;
@@ -74,6 +88,9 @@
     <h2 class="text-2xl font-semibold">Tasks</h2>
     <div class="flex gap-2">
       {#if failedCount > 0}
+        <button class="px-3 py-1.5 border border-accent/40 text-accent rounded hover:bg-accent/10 text-sm" onclick={() => rerunFailed()}>
+          rerun failed ({failedCount})
+        </button>
         <button class="px-3 py-1.5 border border-danger/40 text-danger rounded hover:bg-danger/10 text-sm" onclick={() => clearFailed()}>
           clear failed ({failedCount})
         </button>
@@ -121,9 +138,14 @@
           <div class="flex items-baseline justify-between">
             <a href={`/pipelines/${p.id}`} class="font-mono hover:text-accent">{p.id}</a>
             {#if p.counts.failed > 0}
-              <button class="text-xs text-danger hover:underline" onclick={() => clearFailed(p.id)}>
-                clear failed ({p.counts.failed})
-              </button>
+              <div class="flex gap-2 text-xs">
+                <button class="text-accent hover:underline" onclick={() => rerunFailed(p.id)}>
+                  rerun failed ({p.counts.failed})
+                </button>
+                <button class="text-danger hover:underline" onclick={() => clearFailed(p.id)}>
+                  clear
+                </button>
+              </div>
             {/if}
           </div>
           <div class="mt-2 grid grid-cols-3 gap-1 text-xs text-muted">
@@ -192,6 +214,9 @@
               {#if t.status === "needs_review"}
                 <button class="text-ok text-xs mr-2" onclick={() => approve(t.id)}>approve</button>
                 <button class="text-danger text-xs mr-2" onclick={() => reject(t.id)}>reject</button>
+              {/if}
+              {#if t.status === "failed"}
+                <button class="text-accent text-xs mr-2" onclick={() => rerun(t.id)}>rerun</button>
               {/if}
               {#if removable(t.status)}
                 <button class="text-muted hover:text-danger text-xs" onclick={() => remove(t.id)} title="Remove task">remove</button>

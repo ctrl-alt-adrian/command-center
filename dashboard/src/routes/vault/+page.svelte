@@ -19,6 +19,16 @@
     location.reload();
   }
 
+  async function rerunFailed() {
+    if (!confirm(`Re-queue ${data.failedCount} failed vault-nuggets task(s)?`)) return;
+    await fetch("/api/tasks/rerun", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pipelineId: "vault-nuggets" }),
+    });
+    location.reload();
+  }
+
   async function runExtract() {
     if (running) return;
     const ok = confirm(
@@ -57,6 +67,9 @@
     </div>
     <div class="flex gap-2">
       {#if data.failedCount > 0}
+        <button class="px-3 py-2 border border-accent/40 text-accent rounded hover:bg-accent/10 text-sm" onclick={rerunFailed}>
+          rerun failed ({data.failedCount})
+        </button>
         <button class="px-3 py-2 border border-danger/40 text-danger rounded hover:bg-danger/10 text-sm" onclick={clearFailed}>
           clear failed ({data.failedCount})
         </button>
