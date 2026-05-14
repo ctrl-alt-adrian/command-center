@@ -16,6 +16,7 @@
     <a href="/reddit-pmf" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Reddit PMF</a>
     <a href="/software-factory" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Software Factory</a>
     <a href="/rolenext" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">RoleNext</a>
+    <hr class="border-t border-border mt-3 mx-3" />
     <div class="mt-auto text-xs text-muted px-3">all 6 phases · port 3001</div>
   </aside>
   <main class="flex-1 min-w-0 p-6">
