@@ -27,6 +27,26 @@
     return { draftDir, hook, angle, candidateId, platforms };
   });
 
+  // Personal-brand discovery tasks land their candidate list in `output`. Render
+  // it as a scrollable picker so the captain can read what was picked, drill into
+  // source notes, and judge whether to approve the whole batch.
+  type BrandPick = { id: string; pillar: string; title: string; tier?: number; tags?: string[]; summary?: string; reason?: string };
+  const brandContext = $derived.by<{ picked: number; candidates: BrandPick[] } | null>(() => {
+    if (t.pipelineId !== "personal-brand") return null;
+    if (t.phaseId !== "discovery") return null;
+    const output = (t.output ?? {}) as Record<string, unknown>;
+    const candidates = Array.isArray(output.candidates) ? (output.candidates as BrandPick[]) : null;
+    if (!candidates) return null;
+    return {
+      picked: typeof output.picked === "number" ? output.picked : candidates.length,
+      candidates,
+    };
+  });
+  function vaultNoteHref(c: BrandPick): string {
+    // c.id is `vault:<pillar>:<filename>` — decode to /vault/<pillar>/<encoded filename>
+    return `/vault/${c.pillar}/${encodeURIComponent(c.title)}`;
+  }
+
   async function approve() {
     await fetch(`/api/tasks/${t.id}/approve`, { method: "POST" });
     location.reload();
@@ -154,6 +174,49 @@
           whether to refine, regenerate, or reject from here.
         </p>
       {/if}
+    </section>
+  {/if}
+
+  {#if brandContext}
+    <section class="bg-card border border-border rounded p-4 space-y-3">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-medium text-muted uppercase tracking-wider">Personal-brand discovery picks</h3>
+          <p class="text-xs text-muted mt-1">
+            Discovery surfaced <strong class="text-foreground">{brandContext.picked}</strong>
+            tier-1 vault note{brandContext.picked === 1 ? "" : "s"} matching the brand filter
+            (tier 1 · content_ready · audience ≠ product).
+          </p>
+        </div>
+      </div>
+      {#if t.status === "needs_review"}
+        <p class="text-xs text-muted/80 pb-1 border-b border-border/40">
+          Review the picks below. <strong class="text-ok">Approve</strong> to mark this batch as
+          reviewed — Phase B (generate per-platform) will pick this up once shipped. For now,
+          approving just completes the task.
+        </p>
+      {/if}
+      <ul class="space-y-2 max-h-96 overflow-y-auto pr-1">
+        {#each brandContext.candidates as c}
+          <li class="bg-sidebar/40 border border-border/60 rounded p-3 space-y-1">
+            <div class="flex items-baseline justify-between gap-3">
+              <a href={vaultNoteHref(c)} class="font-medium hover:text-accent truncate">{c.title}</a>
+              <a href={`/vault/${c.pillar}`} class="text-xs font-mono text-muted hover:text-accent whitespace-nowrap">{c.pillar}</a>
+            </div>
+            {#if c.summary}
+              <p class="text-xs text-muted line-clamp-2">{c.summary}</p>
+            {/if}
+            <div class="flex flex-wrap gap-2 text-xs text-muted/70 pt-1">
+              {#if c.tier}<span>tier {c.tier}</span>{/if}
+              {#if c.tags && c.tags.length > 0}
+                {#each c.tags.slice(0, 5) as tag}<span>#{tag}</span>{/each}
+                {#if c.tags.length > 5}<span>+{c.tags.length - 5} more</span>{/if}
+              {/if}
+              {#if c.reason}<span class="text-muted/50 ml-auto">{c.reason}</span>{/if}
+            </div>
+          </li>
+        {/each}
+      </ul>
     </section>
   {/if}
 
