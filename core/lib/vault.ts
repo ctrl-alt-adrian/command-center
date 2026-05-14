@@ -50,6 +50,14 @@ export function parseFrontmatter(raw: string): { meta: NoteFrontmatter; body: st
   if (!m) return { meta: {}, body: raw };
   try {
     const meta = (yaml.load(m[1]) as NoteFrontmatter) ?? {};
+    // js-yaml parses unquoted ISO date scalars (e.g. `created: 2026-05-14`) as
+    // JavaScript Date objects. Every caller treats these fields as strings —
+    // coerce here so the NoteFrontmatter contract holds at runtime.
+    for (const [key, value] of Object.entries(meta)) {
+      if (value instanceof Date) {
+        meta[key] = value.toISOString().slice(0, 10);
+      }
+    }
     return { meta, body: raw.slice(m[0].length) };
   } catch {
     return { meta: {}, body: raw };
