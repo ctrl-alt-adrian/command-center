@@ -15,6 +15,10 @@ export const personalBrandPipeline: PipelineConfig = {
     "fan-out to per-pick generate tasks → per-platform drafts land in /personal-brand/drafts " +
     "for captain edit + refine + final review.",
   backpressureCap: 5,
+  // Discovery picks can run into the hundreds; only fan out a controlled batch
+  // at a time so a single approval doesn't kick off claude-spend for everything.
+  // Captain advances the rest via 'Resume next batch' on /tasks or /personal-brand.
+  fanOutBatchSize: 25,
   phases: [
     {
       id: "discovery",

@@ -1,8 +1,9 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import Failures from "$lib/Failures.svelte";
 
   let { data } = $props();
-  let filter = $state<"all" | "pending" | "needs_review" | "failed" | "completed" | "paused_backpressure">("all");
+  let filter = $state<"all" | "pending" | "needs_review" | "failed" | "completed" | "paused_backpressure" | "paused_user">("all");
 
   $effect(() => {
     const id = setInterval(() => invalidateAll(), 5000);
@@ -14,6 +15,7 @@
     running: "text-accent",
     needs_review: "text-warn",
     paused_backpressure: "text-danger",
+    paused_user: "text-warn",
     completed: "text-muted",
     failed: "text-danger",
     cleared_stale: "text-muted",
@@ -44,8 +46,6 @@
     await invalidateAll();
   }
   async function rerunFailed(pipelineId?: string) {
-    const scope = pipelineId ? `for ${pipelineId}` : "across every pipeline";
-    if (!confirm(`Re-queue every failed task ${scope}?`)) return;
     await fetch("/api/tasks/rerun", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -53,9 +53,15 @@
     });
     await invalidateAll();
   }
+  async function resumeBatch(pipelineId?: string, count = 25) {
+    await fetch("/api/tasks/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pipelineId, count }),
+    });
+    await invalidateAll();
+  }
   async function clearFailed(pipelineId?: string) {
-    const scope = pipelineId ? `for ${pipelineId}` : "across every pipeline";
-    if (!confirm(`Remove every failed task ${scope}? This is irreversible.`)) return;
     await fetch("/api/tasks/clear", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -64,8 +70,6 @@
     await invalidateAll();
   }
   async function clearCompleted(pipelineId?: string) {
-    const scope = pipelineId ? `for ${pipelineId}` : "across every pipeline";
-    if (!confirm(`Remove every completed task ${scope}?`)) return;
     await fetch("/api/tasks/clear", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -80,13 +84,28 @@
 
   const failedCount = $derived(data.tasks.filter((t) => t.status === "failed").length);
   const completedCount = $derived(data.tasks.filter((t) => t.status === "completed").length);
+  const needsReviewCount = $derived(data.tasks.filter((t) => t.status === "needs_review").length);
   const removable = (s: string) => s === "failed" || s === "completed" || s === "cleared_stale";
+
+  async function approveAll(pipelineId?: string) {
+    await fetch("/api/tasks/approve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pipelineId }),
+    });
+    await invalidateAll();
+  }
 </script>
 
 <div class="space-y-6">
   <div class="flex items-center justify-between">
     <h2 class="text-2xl font-semibold">Tasks</h2>
-    <div class="flex gap-2">
+    <div class="flex gap-2 flex-wrap">
+      {#if needsReviewCount > 0}
+        <button class="px-3 py-1.5 border border-warn/40 text-warn rounded hover:bg-warn/10 text-sm" onclick={() => approveAll()}>
+          approve all ({needsReviewCount})
+        </button>
+      {/if}
       {#if failedCount > 0}
         <button class="px-3 py-1.5 border border-accent/40 text-accent rounded hover:bg-accent/10 text-sm" onclick={() => rerunFailed()}>
           rerun failed ({failedCount})
@@ -105,6 +124,8 @@
       </button>
     </div>
   </div>
+
+  <Failures failures={data.failures} title="Failures across all pipelines" />
 
   {#if data.lastProcessor && data.lastProcessor.deferred > 0}
     <div class="bg-warn/10 border border-warn/40 rounded p-3 text-sm">
@@ -154,8 +175,21 @@
             <span class="text-warn">needs_review: {p.counts.needs_review} / {p.backpressureCap}</span>
             <span>completed: {p.counts.completed}</span>
             <span class="text-danger">failed: {p.counts.failed}</span>
-            <span class="text-danger">paused: {p.counts.paused_backpressure ?? 0}</span>
+            <span class="text-warn">paused: {(p.counts.paused_backpressure ?? 0) + (p.counts.paused_user ?? 0)}</span>
           </div>
+          {#if (p.counts.paused_user ?? 0) > 0}
+            <div class="mt-2 flex items-center justify-between text-xs">
+              <span class="text-warn">{p.counts.paused_user} held back from fan-out</span>
+              <div class="flex gap-2">
+                <button class="text-accent hover:underline" onclick={() => resumeBatch(p.id, 25)}>
+                  resume next 25
+                </button>
+                <button class="text-accent hover:underline" onclick={() => resumeBatch(p.id, p.counts.paused_user ?? 0)}>
+                  resume all
+                </button>
+              </div>
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
@@ -164,7 +198,7 @@
   <section class="space-y-2">
     <div class="flex items-center gap-2 text-sm">
       <span class="text-muted">filter:</span>
-      {#each ["all", "pending", "needs_review", "paused_backpressure", "failed", "completed"] as f}
+      {#each ["all", "pending", "needs_review", "paused_user", "paused_backpressure", "failed", "completed"] as f}
         <button
           class="px-2 py-1 rounded text-xs {filter === f ? 'bg-accent text-background' : 'bg-card text-muted hover:text-foreground'}"
           onclick={() => (filter = f as typeof filter)}

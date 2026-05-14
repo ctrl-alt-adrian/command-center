@@ -53,15 +53,16 @@ export async function listTasks(): Promise<Task[]> {
     const t = await getTask(e);
     if (t) tasks.push(t);
   }
-  // Sort: running, pending, needs_review, paused_backpressure, failed, completed, cleared_stale
+  // Sort: running, pending, needs_review, paused (both kinds), failed, completed, cleared_stale
   const weight: Record<TaskStatus, number> = {
     running: 0,
     pending: 1,
-    paused_backpressure: 2,
-    needs_review: 3,
-    failed: 4,
-    completed: 5,
-    cleared_stale: 6,
+    paused_user: 2,
+    paused_backpressure: 3,
+    needs_review: 4,
+    failed: 5,
+    completed: 6,
+    cleared_stale: 7,
   };
   tasks.sort((a, b) => {
     const sw = weight[a.status] - weight[b.status];

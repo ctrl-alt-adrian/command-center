@@ -153,6 +153,9 @@ export const marketingPipeline: PipelineConfig = {
   description:
     "Daily content pipeline: KB scanner + signal analyzer + dedup discover candidates → captain approves one → per-platform fan-out → deterministic slop gate (3 retries) → captain final review. Six platforms: linkedin, x, instagram, facebook, reddit, blog.",
   backpressureCap: 5,
+  // Approve once → fan out 25 generate tasks pending, rest paused_user.
+  // Captain advances next batch via 'Resume next batch' on /tasks or /marketing.
+  fanOutBatchSize: 25,
   cronSchedule: "0 11 * * *",
   phases: [discoveryPhase, generatePhase, slopCheckPhase, reviewPhase],
 };

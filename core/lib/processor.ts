@@ -253,18 +253,27 @@ async function advanceOrComplete(pipeline: PipelineConfig, phase: PhaseConfig, t
       await logEvent("fanout_empty", { taskId: task.id, nextPhase: next });
       return;
     }
-    for (const el of elements) {
+    // Honor pipeline.fanOutBatchSize: first N go pending, the rest get
+    // paused_user so the captain can drain them in controlled batches via
+    // the /api/tasks/resume endpoint rather than spawning everything at once.
+    const batchSize = pipeline.fanOutBatchSize ?? elements.length;
+    let pendingCount = 0;
+    let pausedCount = 0;
+    for (let i = 0; i < elements.length; i++) {
+      const status = i < batchSize ? "pending" : "paused_user";
       await createTask({
         pipelineId: pipeline.id,
         phaseId: next,
-        input: { ...baseInput, ...el },
+        input: { ...baseInput, ...elements[i] },
         parentId: task.parentId ?? task.id,
-        status: "pending",
+        status,
       });
+      if (status === "pending") pendingCount++;
+      else pausedCount++;
     }
     await updateTask(task.id, { status: "completed" });
-    consoleLog("fanned_out", { taskId: task.id, nextPhase: next, count: elements.length });
-    await logEvent("fanned_out", { taskId: task.id, nextPhase: next, count: elements.length });
+    consoleLog("fanned_out", { taskId: task.id, nextPhase: next, total: elements.length, pending: pendingCount, paused: pausedCount });
+    await logEvent("fanned_out", { taskId: task.id, nextPhase: next, total: elements.length, pending: pendingCount, paused: pausedCount });
     return;
   }
 
@@ -307,6 +316,30 @@ export async function rejectTask(id: string, reason?: string): Promise<Task | nu
   return await getTask(id);
 }
 
+/** Flip the next N paused_user tasks for a pipeline back to pending,
+ *  oldest createdAt first. Returns the count of tasks actually resumed.
+ *  When pipelineId is omitted, drains across every pipeline. */
+export async function resumePausedUserTasks(
+  pipelineId: string | undefined,
+  count: number,
+): Promise<{ resumed: number; ids: string[] }> {
+  if (count <= 0) return { resumed: 0, ids: [] };
+  const all = await listTasks();
+  const candidates = all
+    .filter((t) => t.status === "paused_user")
+    .filter((t) => (pipelineId ? t.pipelineId === pipelineId : true))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .slice(0, count);
+  const ids: string[] = [];
+  for (const t of candidates) {
+    await updateTask(t.id, { status: "pending" });
+    ids.push(t.id);
+    consoleLog("resumed_user", { taskId: t.id, pipelineId: t.pipelineId });
+    await logEvent("resumed_user", { taskId: t.id, pipelineId: t.pipelineId });
+  }
+  return { resumed: ids.length, ids };
+}
+
 /** Re-queue a failed task: flip status back to pending, clear the error,
  *  reset the retry counter so the phase's retryPolicy starts fresh. The
  *  `attempts` history is preserved so prior failures stay visible. */
@@ -336,7 +369,7 @@ export async function pipelineStatus(): Promise<
       id: p.id,
       phases: p.phases.map((ph) => ({ id: ph.id, gateType: ph.gateType })),
       backpressureCap: p.backpressureCap ?? DEFAULT_BACKPRESSURE_CAP,
-      counts: { needs_review: 0, pending: 0, running: 0, completed: 0, failed: 0, paused_backpressure: 0, ...counts },
+      counts: { needs_review: 0, pending: 0, running: 0, completed: 0, failed: 0, paused_backpressure: 0, paused_user: 0, ...counts },
     });
   }
   return result;

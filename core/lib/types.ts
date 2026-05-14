@@ -7,6 +7,7 @@ export type TaskStatus =
   | "completed"
   | "failed"
   | "paused_backpressure"
+  | "paused_user"
   | "cleared_stale";
 
 export interface GateCheckResult {
@@ -59,6 +60,15 @@ export interface PipelineConfig {
    * with every other pipeline that also has no override.
    */
   perTickCap?: number;
+  /**
+   * Maximum number of fan-out children to create with `status: pending` at
+   * once. Children beyond this count are created as `paused_user` and stay
+   * inert until the captain clicks "Resume next batch" on /tasks or the
+   * pipeline's dashboard page. This prevents a single approval (e.g. brand
+   * discovery picking 204 candidates) from kicking off hundreds of claude
+   * calls all at once. Unset = no batch limit (legacy behavior).
+   */
+  fanOutBatchSize?: number;
   cronSchedule?: string;
 }
 
