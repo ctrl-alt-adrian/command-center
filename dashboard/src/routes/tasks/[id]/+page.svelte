@@ -47,6 +47,33 @@
     return `/vault/${c.pillar}/${encodeURIComponent(c.title)}`;
   }
 
+  // Personal-brand generate/review tasks carry the draft slug forward in their
+  // input chain. Surface a direct link to the editor + a summary of the source pick.
+  const brandDraftContext = $derived.by(() => {
+    if (t.pipelineId !== "personal-brand") return null;
+    if (t.phaseId !== "review" && t.phaseId !== "generate") return null;
+    const input = (t.input ?? {}) as Record<string, unknown>;
+    const output = (t.output ?? {}) as Record<string, unknown>;
+    const candidate = (input.candidate ?? {}) as Record<string, unknown>;
+    const draftSlug =
+      (typeof output.draftSlug === "string" ? output.draftSlug : null) ??
+      (typeof input.draftSlug === "string" ? input.draftSlug : null);
+    const platforms = Array.isArray(output.platforms)
+      ? (output.platforms as string[])
+      : Array.isArray(input.platforms)
+        ? (input.platforms as string[])
+        : null;
+    const failedPlatforms = Array.isArray(output.failedPlatforms)
+      ? (output.failedPlatforms as string[])
+      : Array.isArray(input.failedPlatforms)
+        ? (input.failedPlatforms as string[])
+        : null;
+    const title = typeof candidate.title === "string" ? candidate.title : null;
+    const pillar = typeof candidate.pillar === "string" ? candidate.pillar : null;
+    if (!draftSlug && !title) return null;
+    return { draftSlug, platforms, failedPlatforms, title, pillar };
+  });
+
   async function approve() {
     await fetch(`/api/tasks/${t.id}/approve`, { method: "POST" });
     location.reload();
@@ -56,7 +83,6 @@
     location.reload();
   }
   async function remove() {
-    if (!confirm(`Delete task ${t.id}? This is irreversible.`)) return;
     await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
     location.href = "/tasks";
   }
@@ -172,6 +198,45 @@
         <p class="text-xs text-muted/80 pt-1 border-t border-border/40">
           Slop gate failed retries. Open the drafts editor to inspect each platform's output and decide
           whether to refine, regenerate, or reject from here.
+        </p>
+      {/if}
+    </section>
+  {/if}
+
+  {#if brandDraftContext}
+    <section class="bg-card border border-border rounded p-4 space-y-3">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-medium text-muted uppercase tracking-wider">Personal-brand draft set</h3>
+          {#if brandDraftContext.title}
+            <p class="font-medium mt-1">{brandDraftContext.title}</p>
+          {/if}
+          {#if brandDraftContext.pillar}
+            <p class="text-xs text-muted mt-1">source pillar: <span class="font-mono">{brandDraftContext.pillar}</span></p>
+          {/if}
+        </div>
+        {#if brandDraftContext.draftSlug}
+          <a
+            href={`/personal-brand/drafts/${brandDraftContext.draftSlug}`}
+            class="text-xs px-3 py-1.5 rounded bg-accent text-background font-medium hover:opacity-90 whitespace-nowrap"
+          >
+            Open drafts editor →
+          </a>
+        {/if}
+      </div>
+      {#if brandDraftContext.platforms && brandDraftContext.platforms.length > 0}
+        <div class="text-xs text-muted">
+          platforms: {brandDraftContext.platforms.join(", ")}
+          {#if brandDraftContext.failedPlatforms && brandDraftContext.failedPlatforms.length > 0}
+            <span class="text-danger ml-2">(failed: {brandDraftContext.failedPlatforms.join(", ")})</span>
+          {/if}
+        </div>
+      {/if}
+      {#if t.phaseId === "review" && t.status === "needs_review"}
+        <p class="text-xs text-muted/80 pt-1 border-t border-border/40">
+          Open the drafts editor to read each platform's post, edit inline, refine with Claude,
+          then come back and <strong class="text-ok">approve</strong> if it ships — or
+          <strong class="text-danger">reject</strong> to discard.
         </p>
       {/if}
     </section>

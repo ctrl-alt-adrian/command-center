@@ -1,9 +1,11 @@
 import { discoverBrandCandidates } from "../../../../pipelines/personal-brand/lib/discovery.ts";
+import { getBrandDraftSets } from "../../../../pipelines/personal-brand/lib/drafts.ts";
 import { listTasksByPipeline } from "../../../../core/lib/tasks.ts";
 
 export async function load() {
-  const [eligible, tasks] = await Promise.all([
+  const [eligible, drafts, tasks] = await Promise.all([
     discoverBrandCandidates().catch(() => []),
+    getBrandDraftSets().catch(() => []),
     listTasksByPipeline("personal-brand"),
   ]);
 
@@ -28,6 +30,7 @@ export async function load() {
       title: c.title,
       reason: c.reason,
     })),
+    draftCount: drafts.length,
     taskCount: tasks.length,
     needsReview: tasks.filter((t) => t.status === "needs_review").length,
     runningCount: tasks.filter((t) => t.status === "running").length,

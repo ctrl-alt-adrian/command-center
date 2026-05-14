@@ -40,7 +40,6 @@
   }
 
   async function rerunFailed() {
-    if (!confirm(`Re-queue ${data.failedCount} failed personal-brand task(s)?`)) return;
     await fetch("/api/tasks/rerun", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -50,7 +49,6 @@
   }
 
   async function clearFailed() {
-    if (!confirm(`Remove ${data.failedCount} failed personal-brand task(s)? This is irreversible.`)) return;
     await fetch("/api/tasks/clear", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -106,20 +104,20 @@
       <div class="text-2xl font-mono mt-1 {data.eligibleCount === 0 ? 'text-muted' : ''}">{data.eligibleCount}</div>
       <div class="text-xs text-muted mt-1">vault notes matching the brand filter</div>
     </div>
-    <div class="bg-card border border-border rounded p-3">
-      <div class="text-xs text-muted">running</div>
-      <div class="text-2xl font-mono mt-1 {data.runningCount > 0 ? 'text-accent' : ''}">{data.runningCount}</div>
-      <div class="text-xs text-muted mt-1">active discovery tasks</div>
-    </div>
+    <a href="/personal-brand/drafts" class="bg-card border border-border rounded p-3 hover:border-accent transition-colors block">
+      <div class="text-xs text-muted">drafts</div>
+      <div class="text-2xl font-mono mt-1">{data.draftCount}</div>
+      <div class="text-xs text-muted mt-1">per-platform draft sets generated</div>
+    </a>
     <div class="bg-card border border-border rounded p-3">
       <div class="text-xs text-muted">needs review</div>
       <div class="text-2xl font-mono mt-1 {data.needsReview > 0 ? 'text-warn' : ''}">{data.needsReview}</div>
-      <div class="text-xs text-muted mt-1">discovery results awaiting captain</div>
+      <div class="text-xs text-muted mt-1">tasks awaiting captain</div>
     </div>
     <div class="bg-card border border-border rounded p-3">
-      <div class="text-xs text-muted">total tasks</div>
-      <div class="text-2xl font-mono mt-1">{data.taskCount}</div>
-      <div class="text-xs text-muted mt-1">all-time, any status</div>
+      <div class="text-xs text-muted">running</div>
+      <div class="text-2xl font-mono mt-1 {data.runningCount > 0 ? 'text-accent' : ''}">{data.runningCount}</div>
+      <div class="text-xs text-muted mt-1">active tasks (discovery / generate)</div>
     </div>
   </section>
 
