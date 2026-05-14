@@ -1,0 +1,20 @@
+{
+  "name": "command-center",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Hub for marketing, software factory, and future domains. Built on phases + gates over a domain-agnostic core runtime.",
+  "scripts": {
+    "dev": "cd dashboard && npm run dev",
+    "check": "cd dashboard && npm run check",
+    "build": "cd dashboard && npm run build"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.5.2",
+    "typescript": "^6.0.2"
+  }
+}

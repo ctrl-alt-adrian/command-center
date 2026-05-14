@@ -1,0 +1,77 @@
+# Slop detection rules
+# Each rule has a pattern (regex), description, and severity (warn | fail)
+
+banned_words:
+  - pattern: "\\bdelve\\b"
+    description: "Overused AI word"
+    severity: fail
+  - pattern: "\\bleverage\\b"
+    description: "Corporate jargon, use 'use' instead"
+    severity: warn
+  - pattern: "\\btapestry\\b"
+    description: "AI-typical metaphor"
+    severity: fail
+  - pattern: "\\blandscape\\b"
+    description: "Vague AI filler"
+    severity: warn
+  - pattern: "\\bunlock\\b"
+    description: "Overused AI verb"
+    severity: warn
+  - pattern: "\\bgame.?changer\\b"
+    description: "Cliche"
+    severity: warn
+  - pattern: "\\bseamless(ly)?\\b"
+    description: "AI-typical adjective"
+    severity: warn
+  - pattern: "\\brobust\\b"
+    description: "Overused AI adjective"
+    severity: warn
+  - pattern: "\\bcutting.?edge\\b"
+    description: "Cliche"
+    severity: warn
+  - pattern: "\\bjourney\\b"
+    description: "AI-typical metaphor (unless literal)"
+    severity: warn
+  - pattern: "\\bempowering\\b"
+    description: "AI-typical verb"
+    severity: fail
+  - pattern: "\\bfostering\\b"
+    description: "AI-typical verb"
+    severity: warn
+  - pattern: "\\bnavigat(e|ing)\\b"
+    description: "AI-typical metaphor (unless literal)"
+    severity: warn
+
+banned_patterns:
+  - pattern: "\\u2014"
+    description: "Em dash - replace with comma, period, or parenthetical"
+    severity: fail
+  - pattern: "It'?s worth noting that"
+    description: "Hedging filler - just state the thing"
+    severity: fail
+  - pattern: "In today'?s (world|landscape|environment)"
+    description: "Generic AI opener"
+    severity: fail
+  - pattern: "At the end of the day"
+    description: "Cliche filler"
+    severity: warn
+  - pattern: "(?i)as (a|an) .{0,30}, I"
+    description: "AI self-identification pattern"
+    severity: fail
+  - pattern: "(?i)in (this|my) (article|post|piece)"
+    description: "Meta-reference - just say the thing"
+    severity: warn
+  - pattern: "(?i)let'?s dive in"
+    description: "AI-typical transition"
+    severity: fail
+  - pattern: "(?i)without further ado"
+    description: "Filler"
+    severity: warn
+  - pattern: "\\!.*\\!.*\\!"
+    description: "Excessive exclamation marks"
+    severity: warn
+
+style_checks:
+  max_passive_voice_pct: 20
+  max_sentence_length: 35
+  min_concrete_detail: true  # flag if post has no specific numbers, names, or examples
