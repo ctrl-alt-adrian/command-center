@@ -144,9 +144,14 @@ export async function listNotes(opts: { pillar?: Pillar | string; vaultRoot?: st
   const dir = opts.pillar ? path.join(root, opts.pillar) : root;
   const files = await walkDir(dir);
   const out: VaultNote[] = [];
+  const known = new Set<string>(PILLARS);
   for (const f of files) {
     const n = await readNote(f, root);
-    if (n) out.push(n);
+    if (!n) continue;
+    // A note's "pillar" is its top-level directory under VAULT_ROOT. Anything
+    // sitting at the root (vault/README.md) or in an unknown dir isn't a note.
+    if (!known.has(n.pillar)) continue;
+    out.push(n);
   }
   return out;
 }
