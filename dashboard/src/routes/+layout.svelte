@@ -9,6 +9,7 @@
     <a href="/" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Overview</a>
     <a href="/tasks" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Tasks</a>
     <div class="text-xs text-muted px-3 mt-3 mb-1 uppercase tracking-wider">Domains</div>
+    <hr class="border-t border-border mx-3 mb-1" />
     <a href="/marketing" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Marketing</a>
     <a href="/personal-brand" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Personal Brand</a>
     <a href="/vault" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Vault</a>
@@ -16,7 +17,6 @@
     <a href="/reddit-pmf" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Reddit PMF</a>
     <a href="/software-factory" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Software Factory</a>
     <a href="/rolenext" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">RoleNext</a>
-    <hr class="border-t border-border mt-3 mx-3" />
     <div class="mt-auto text-xs text-muted px-3">all 6 phases · port 3001</div>
   </aside>
   <main class="flex-1 min-w-0 p-6">
