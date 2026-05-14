@@ -11,12 +11,16 @@ export const vaultNuggetsPipeline: PipelineConfig = {
     "Phase 2 (embed) writes approved candidates into their pillar directory, " +
     "creates stub files for missing wikilink targets, and appends to each pillar's Map of Content.",
   backpressureCap: 5,
+  // Extract scans ~100 sources sequentially via Haiku; one task fully occupies
+  // a tick. Independent budget so it can run alongside other pipelines.
+  perTickCap: 1,
   cronSchedule: "0 9 * * *",
   phases: [
     {
       id: "extract",
       gateType: "needs_review",
-      timeoutMs: 10 * 60 * 1000,
+      // 94 rolenext sessions × ~7s/Haiku call ≈ 11 min worst case; 30 min headroom.
+      timeoutMs: 30 * 60 * 1000,
       run: async (task, ctx) => {
         ctx.log("nuggets extract starting");
         const result = await runExtract(task.id, ctx.outputDir);
