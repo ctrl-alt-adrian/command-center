@@ -143,12 +143,18 @@
       <h3 class="text-sm font-medium text-muted uppercase tracking-wider">Sample eligible notes (preview)</h3>
       <ul class="space-y-1.5">
         {#each data.eligiblePreview as c}
-          <li class="bg-card border border-border rounded p-3 text-sm">
-            <div class="flex items-baseline justify-between gap-3">
-              <a href={`/vault/${c.pillar}`} class="font-mono text-xs text-muted hover:text-accent">{c.pillar}</a>
-              <span class="text-xs text-muted/70">{c.reason}</span>
-            </div>
-            <div class="mt-1 font-medium">{c.title}</div>
+          <li class="bg-card border border-border rounded text-sm hover:border-accent transition-colors">
+            <a
+              href={`/vault/${c.pillar}/${encodeURIComponent(c.filename)}`}
+              class="block p-3"
+              title="Open note in vault"
+            >
+              <div class="flex items-baseline justify-between gap-3">
+                <span class="font-mono text-xs text-muted">{c.pillar}</span>
+                <span class="text-xs text-muted/70">{c.reason}</span>
+              </div>
+              <div class="mt-1 font-medium hover:text-accent">{c.title}</div>
+            </a>
           </li>
         {/each}
       </ul>

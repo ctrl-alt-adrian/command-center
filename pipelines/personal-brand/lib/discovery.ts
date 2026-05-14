@@ -3,6 +3,7 @@ import { listNotes } from "../../../core/lib/vault.ts";
 export interface BrandCandidate {
   id: string;          // vault:<pillar>:<filename>
   pillar: string;
+  filename: string;    // basename without extension — matches /vault/<pillar>/<filename> route param
   title: string;
   tier: number;
   tags: string[];
@@ -41,6 +42,7 @@ export async function discoverBrandCandidates(): Promise<BrandCandidate[]> {
     out.push({
       id: `vault:${n.pillar}:${n.filename}`,
       pillar: String(n.pillar),
+      filename: n.filename,
       title: (fm.title as string) || n.filename,
       tier,
       tags: Array.isArray(fm.tags) ? (fm.tags as string[]) : [],

@@ -24,6 +24,7 @@ export async function load() {
     eligiblePreview: eligible.slice(0, 8).map((c) => ({
       id: c.id,
       pillar: c.pillar,
+      filename: c.filename,
       title: c.title,
       reason: c.reason,
     })),
