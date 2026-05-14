@@ -27,3 +27,6 @@ vault/*
 
 # Marketing pipeline runtime
 pipelines/marketing/config.json
+
+# RoleNext bug-resolver runtime state — fingerprints + daily counter regenerate per machine
+pipelines/rolenext/bug-resolver/state/*.json

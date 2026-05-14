@@ -8,6 +8,7 @@ import {
   isReopened,
   getPRComments,
   getPRReviews,
+  getIssueComments,
   type GitHubIssue,
   type GitHubPR,
 } from "../lib/github.ts";
@@ -163,6 +164,54 @@ function hasOpenSentinel(tasks: Task[]): boolean {
   );
 }
 
+const COMMENT_RETRIAGE_TERMINAL_STATES = new Set([
+  "completed",
+  "failed",
+  "cleared_stale",
+  "needs_review",
+]);
+
+/** Detect "new non-bot comment activity since the latest triage task for this issue."
+ *  Returns the prior task's fingerprint (so we preserve the dedup chain) when a new
+ *  triage should be spawned, else null. Used to fold "user clarified the bug in a
+ *  comment" into the reopen flow without GitHub firing an actual reopen event. */
+async function maybeCommentTriggeredRetriage(
+  issue: GitHubIssue,
+  repo: string,
+  ctx: PhaseContext,
+): Promise<{ fingerprint: string } | null> {
+  const allTasks = await listTasksByPipeline(PIPELINE_ID);
+  const tasksForIssue = allTasks
+    .filter((t) => (t.input as { issueNumber?: number }).issueNumber === issue.number)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (tasksForIssue.length === 0) return null;
+
+  const latest = tasksForIssue[0];
+  // Only fire when the latest task isn't actively running — avoids stacking two triages
+  // for the same issue. pending/running tasks block this path.
+  if (!COMMENT_RETRIAGE_TERMINAL_STATES.has(latest.status)) return null;
+
+  let comments;
+  try {
+    comments = await getIssueComments(repo, issue.number);
+  } catch (err) {
+    ctx.log("issue-comments-fetch-failed", { issueNumber: issue.number, error: (err as Error).message });
+    return null;
+  }
+
+  const latestCreatedAt = latest.createdAt;
+  const hasNewComment = comments.some(
+    (c) => !c.user.login.endsWith("[bot]") && c.created_at > latestCreatedAt,
+  );
+  if (!hasNewComment) return null;
+
+  // Preserve the existing fingerprint so we don't accidentally break dedup chains.
+  const fingerprint =
+    (latest.input as { fingerprint?: string }).fingerprint ?? "";
+  ctx.log("comment-triggered-retriage", { issueNumber: issue.number, fingerprint });
+  return { fingerprint };
+}
+
 async function buildCandidate(
   issue: GitHubIssue,
   fingerprint: string,
@@ -246,21 +295,41 @@ export async function runPollIssues(
       break;
     }
 
-    const reopened = isReopened(issue);
+    let reopened = isReopened(issue);
     const dedup = reopened
       ? await checkDedupForReopen(issue, { openBotPRs })
       : await checkDedup(issue, { openBotPRs });
 
+    let commentTriggeredRetriage = false;
+    let dedupForRetriage: { skip: false; fingerprint: string } | null = null;
+
     if (dedup.skip) {
-      output.skipped.push({ issueNumber: issue.number, layer: dedup.layer, reason: dedup.reason });
-      if (dedup.layer === 3 && dedup.matchedIssueNumber) {
-        await labelIssue(cfg.repo, issue.number, [
-          "bot-skipped",
-          `duplicate-of-${dedup.matchedIssueNumber}`,
-        ]).catch(() => undefined);
+      // Special case: Layer 1 task-exists skip + new non-bot comment activity since
+      // the most-recent task for this issue → treat as a comment-triggered re-triage,
+      // semantically equivalent to a reopen. The captain gets to confirm via
+      // forced needs_review on the new triage's gate.
+      if (dedup.layer === 1) {
+        const retriage = await maybeCommentTriggeredRetriage(issue, cfg.repo, ctx);
+        if (retriage) {
+          commentTriggeredRetriage = true;
+          dedupForRetriage = { skip: false, fingerprint: retriage.fingerprint };
+          reopened = true; // route through the reopen path below
+          output.reopened.push(issue.number);
+        }
       }
-      continue;
+      if (!commentTriggeredRetriage) {
+        output.skipped.push({ issueNumber: issue.number, layer: dedup.layer, reason: dedup.reason });
+        if (dedup.layer === 3 && dedup.matchedIssueNumber) {
+          await labelIssue(cfg.repo, issue.number, [
+            "bot-skipped",
+            `duplicate-of-${dedup.matchedIssueNumber}`,
+          ]).catch(() => undefined);
+        }
+        continue;
+      }
     }
+
+    const effectiveDedup = dedupForRetriage ?? (dedup as { skip: false; fingerprint: string });
 
     let attempt = 1;
     let priorPrUrl: string | null = null;
@@ -279,7 +348,7 @@ export async function runPollIssues(
     const overLimit = attempt > REOPEN_ATTEMPT_LIMIT;
     const candidate = await buildCandidate(
       issue,
-      dedup.fingerprint,
+      effectiveDedup.fingerprint,
       attempt,
       priorPrUrl,
       overLimit, // forceNeedsReview at fanOut time
@@ -288,7 +357,7 @@ export async function runPollIssues(
 
     output.candidates.push(candidate);
 
-    await upsertFingerprint(dedup.fingerprint, {
+    await upsertFingerprint(effectiveDedup.fingerprint, {
       issueNumber: issue.number,
       status: "in-flight",
       prUrl: null,

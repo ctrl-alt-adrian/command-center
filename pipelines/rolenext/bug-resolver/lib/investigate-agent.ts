@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { claudeInCwd } from "./claude-in-cwd.ts";
+import { getIssueComments, type GitHubIssueComment } from "./github.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,9 @@ export interface InvestigateInput {
   pageUrl: string;
   /** Present on reopens — the unified diff of the prior merged PR. */
   priorPrDiff?: string;
+  /** Repo slug for fetching live issue comments at investigate time. If absent,
+   *  the agent runs without comment context. */
+  repo?: string;
 }
 
 export interface FileImplicated {
@@ -104,11 +108,21 @@ function validate(parsed: unknown): InvestigateResult | string {
   };
 }
 
-function buildPrompt(input: InvestigateInput, basePrompt: string): string {
+function buildPrompt(
+  input: InvestigateInput,
+  basePrompt: string,
+  comments: GitHubIssueComment[],
+): string {
   const parts = [basePrompt, "", "---", "", "## Bug report"];
   parts.push(`- Issue #${input.issueNumber}: ${input.issueTitle}`);
   if (input.pageUrl) parts.push(`- Page URL: ${input.pageUrl}`);
   parts.push("", "### Body", "", input.issueBody || "(no body)", "");
+  if (comments.length > 0) {
+    parts.push("### Comments (later clarifications)", "");
+    for (const c of comments) {
+      parts.push(`**@${c.user.login}** at ${c.created_at}:`, "", c.body.trim(), "");
+    }
+  }
   if (input.priorPrDiff && input.priorPrDiff.trim().length > 0) {
     parts.push(
       "---",
@@ -142,10 +156,20 @@ async function callOnce(prompt: string, cwd: string): Promise<{ raw: string }> {
   return { raw };
 }
 
-/** Run the investigate agent with one retry on JSON-parse failure. */
+/** Run the investigate agent with one retry on JSON-parse failure.
+ *  Fetches the issue's comments live from GitHub (not from poll-time snapshot)
+ *  so subsequent user clarifications surface to the agent. */
 export async function runInvestigate(input: InvestigateInput): Promise<InvestigateOutcome> {
   const basePrompt = await fs.readFile(PROMPT_PATH, "utf-8");
-  const prompt = buildPrompt(input, basePrompt);
+  let comments: GitHubIssueComment[] = [];
+  if (input.repo) {
+    try {
+      comments = await getIssueComments(input.repo, input.issueNumber);
+    } catch {
+      // Comments are nice-to-have; the agent still runs with body-only context.
+    }
+  }
+  const prompt = buildPrompt(input, basePrompt, comments);
 
   let { raw } = await callOnce(prompt, input.worktreePath);
   let extracted = extractJson(raw);

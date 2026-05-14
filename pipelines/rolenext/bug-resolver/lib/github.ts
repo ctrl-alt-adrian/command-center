@@ -157,6 +157,20 @@ export async function getPR(repo: string, n: number): Promise<GitHubPR | null> {
   }
 }
 
+export interface GitHubIssueComment {
+  id: number;
+  user: { login: string };
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Get comments on an ISSUE (distinct from PR review-line comments). */
+export async function getIssueComments(repo: string, n: number): Promise<GitHubIssueComment[]> {
+  const raw = await gh(["api", `repos/${repo}/issues/${n}/comments`, "--paginate"]);
+  return JSON.parse(raw) as GitHubIssueComment[];
+}
+
 /** Get line-level review comments on a PR (gh api passthrough). */
 export async function getPRComments(repo: string, n: number): Promise<GitHubReviewComment[]> {
   const raw = await gh(["api", `repos/${repo}/pulls/${n}/comments`, "--paginate"]);

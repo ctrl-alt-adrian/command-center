@@ -74,6 +74,10 @@ export const rolenextBugResolverPipeline: PipelineConfig = {
     "diff scan + regression-test presence + make ci), opens a draft PR for the captain to review and merge, then " +
     "writes a structured post-mortem to vault/incidents/.",
   backpressureCap: 5,
+  // Independent per-tick budget so the resolver isn't starved by the global
+  // pool when other pipelines (e.g. marketing with many pending tasks) saturate
+  // the default cap.
+  perTickCap: 5,
   cronSchedule: "*/15 * * * *",
   phases: [
     {

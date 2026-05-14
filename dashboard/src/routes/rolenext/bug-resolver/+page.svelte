@@ -53,6 +53,33 @@
   function toggle(slug: string) {
     expanded[slug] = !expanded[slug];
   }
+
+  let polling = $state(false);
+  let pollResult = $state<{ ok: boolean; message: string } | null>(null);
+
+  async function runNow() {
+    if (polling) return;
+    polling = true;
+    pollResult = null;
+    try {
+      const taskRes = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pipelineId: "rolenext-bug-resolver" }),
+      });
+      if (!taskRes.ok) {
+        pollResult = { ok: false, message: `task creation failed: ${taskRes.status}` };
+        return;
+      }
+      await fetch("/api/cron", { method: "POST" }).catch(() => undefined);
+      pollResult = { ok: true, message: "poll triggered — refreshing in a moment" };
+      await invalidateAll();
+    } catch (err) {
+      pollResult = { ok: false, message: (err as Error).message };
+    } finally {
+      polling = false;
+    }
+  }
 </script>
 
 <div class="space-y-6">
@@ -69,8 +96,21 @@
         concurrency {data.config.caps.concurrency} · stale {data.config.caps.ticketStaleAfterDays}d
       </p>
     </div>
-    <a href="/" class="text-xs text-muted hover:text-foreground">← home</a>
+    <div class="flex items-center gap-3">
+      <button
+        onclick={runNow}
+        disabled={polling}
+        class="px-3 py-1.5 rounded bg-accent text-background text-sm hover:bg-accent/80 disabled:opacity-50 whitespace-nowrap"
+        title="Run the poll-issues phase immediately (picks up new issues + new comments on existing issues)"
+      >
+        {polling ? "polling…" : "Run now"}
+      </button>
+      <a href="/" class="text-xs text-muted hover:text-foreground">← home</a>
+    </div>
   </div>
+  {#if pollResult}
+    <div class="text-xs {pollResult.ok ? 'text-ok' : 'text-danger'}">{pollResult.message}</div>
+  {/if}
 
   <!-- Queue -->
   <section class="space-y-2">

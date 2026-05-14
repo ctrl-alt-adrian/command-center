@@ -106,6 +106,7 @@ export async function runTriage(
     issueBody: input.issueBody,
     pageUrl: input.pageUrl,
     priorPrDiff,
+    repo: cfg.repo,
   });
 
   // 4. Persist investigate.json to the task output dir for downstream phases.
