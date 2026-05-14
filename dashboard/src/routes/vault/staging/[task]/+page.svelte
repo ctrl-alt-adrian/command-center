@@ -140,7 +140,13 @@
           <div class="space-y-1 flex-1 min-w-0">
             <h3 class="font-semibold">{c.candidate.title}</h3>
             <div class="flex items-center gap-2 text-xs flex-wrap">
-              <span class="font-mono {PILLAR_COLORS[c.candidate.pillar] ?? 'text-muted'}">{c.candidate.pillar}</span>
+              <a
+                href={`/vault/${c.candidate.pillar}`}
+                class="font-mono hover:underline {PILLAR_COLORS[c.candidate.pillar] ?? 'text-muted'}"
+                title={`see all ${c.candidate.pillar} notes`}
+              >
+                {c.candidate.pillar}
+              </a>
               <span class="text-muted">· tier {c.candidate.tier}</span>
               {#if c.candidate.content_ready}<span class="text-ok">· content-ready</span>{/if}
               {#each c.candidate.tags as tag}
