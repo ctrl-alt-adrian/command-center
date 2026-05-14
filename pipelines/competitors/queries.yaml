@@ -1,0 +1,36 @@
+# Niche search queries. Each one runs a YouTube search; results pass through
+# the velocity filter (viewsPerDay ≥ 5k OR totalViews ≥ 100k) before landing
+# in the Niche tab.
+
+queries:
+  # ATS / resume
+  - "AI resume builder"
+  - "ATS resume tips"
+  - "FAANG resume review"
+  - "resume optimization software engineer"
+  - "applicant tracking system bypass"
+
+  # Interview prep
+  - "system design interview"
+  - "behavioral interview FAANG"
+  - "leetcode strategy 2026"
+  - "coding interview prep"
+  - "staff engineer interview"
+
+  # Job-search reality
+  - "got laid off tech"
+  - "no callbacks after 200 applications"
+  - "tech job market 2026"
+  - "software engineer ghosted final round"
+  - "job search anxiety SWE"
+
+  # Career / positioning
+  - "switching from FAANG to startup"
+  - "senior engineer to staff promotion"
+  - "indie hacker software engineer"
+  - "build in public revenue"
+
+  # AI for job seekers
+  - "claude code job search"
+  - "AI tools for engineers career"
+  - "agentic coding workflow"

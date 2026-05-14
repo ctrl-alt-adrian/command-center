@@ -1,0 +1,44 @@
+# Tracked YouTube channels. Edit freely — per-channel rolling 30-day medians
+# are keyed by channelId, so renames don't break state.
+#
+# Each entry: handle (the @whatever or channel URL slug), label (optional
+# display name). Add `id:` when known to skip a lookup on first scrape.
+
+channels:
+  # Software-engineering career creators
+  - handle: "@JomaOppa"
+    label: "Joma Tech"
+  - handle: "@hellomayuko"
+    label: "Mayuko Inoue"
+  - handle: "@TechLeadHD"
+    label: "TechLead"
+  - handle: "@ThePrimeagen"
+    label: "ThePrimeagen"
+  - handle: "@KevinPowell"
+    label: "Kevin Powell"
+  - handle: "@FireshipDev"
+    label: "Fireship"
+  - handle: "@TheCodingTrain"
+    label: "The Coding Train"
+
+  # Job-search / interview prep
+  - handle: "@TechWithTim"
+    label: "Tech With Tim"
+  - handle: "@CleverProgrammer"
+    label: "Clever Programmer"
+
+  # Indie hackers shipping career / AI tooling
+  - handle: "@levelsio"
+    label: "Pieter Levels"
+  - handle: "@iamadamlucas"
+    label: "Adam Lucas"
+  - handle: "@stevenbartlett"
+    label: "Steven Bartlett (DOAC clips)"
+
+  # AI / agentic
+  - handle: "@MatthewBerman"
+    label: "Matthew Berman"
+  - handle: "@aiexplained-official"
+    label: "AI Explained"
+  - handle: "@AICodeKing"
+    label: "AI Code King"

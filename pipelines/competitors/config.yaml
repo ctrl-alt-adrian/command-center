@@ -1,0 +1,23 @@
+# Competitors pipeline thresholds. Tune freely — values reload on next scrape.
+
+outlier:
+  # A tracked-channel video flags as `outlier` when viewCount / channel30dMedian >= ratio.
+  # Channels with < min_history_days of data are skipped (warmup).
+  ratio: 2.0
+  min_history_days: 3
+  rolling_window_days: 30
+
+velocity:
+  # Niche-query result flags as `niche_pass` when EITHER condition holds.
+  views_per_day: 5000
+  total_views: 100000
+
+scrape:
+  # Per-channel: how many recent uploads to pull.
+  uploads_per_channel: 20
+  # Per query: max results to inspect.
+  results_per_query: 20
+
+shorts:
+  # Treat as Short when duration < this OR title contains "#shorts".
+  max_duration_seconds: 60

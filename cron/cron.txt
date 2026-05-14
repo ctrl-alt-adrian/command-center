@@ -7,3 +7,6 @@
 
 # Vault nuggets. Uncomment to enable.
 # 0 9 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"vault-nuggets"}' > /dev/null 2>&1  # command-center vault-nuggets extract
+
+# Competitors scrape (yt-dlp). Uncomment to enable.
+# 0 10 * * * curl -s -X POST http://localhost:3001/api/tasks -H 'content-type: application/json' -d '{"pipelineId":"competitors"}' > /dev/null 2>&1  # command-center competitors scrape
