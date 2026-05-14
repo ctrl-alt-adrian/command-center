@@ -8,6 +8,8 @@ export const softwareFactoryHousekeepingPipeline: PipelineConfig = {
     "appends a per-day log to logs/housekeeping/. Proves the multi-domain pattern — first " +
     "non-marketing pipeline registered under software-factory.",
   backpressureCap: 5,
+  // Pure file-ops, no claude spend — drain quickly when many tasks pile up.
+  perTickCap: 50,
   cronSchedule: "0 3 * * *",
   phases: [
     {

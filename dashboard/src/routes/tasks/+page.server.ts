@@ -1,7 +1,11 @@
 import { listTasks } from "../../../../core/lib/tasks.ts";
-import { pipelineStatus } from "../../../../core/lib/processor.ts";
+import { pipelineStatus, readLastProcessorState } from "../../../../core/lib/processor.ts";
 
 export async function load() {
-  const [tasks, pipelines] = await Promise.all([listTasks(), pipelineStatus()]);
-  return { tasks, pipelines };
+  const [tasks, pipelines, lastProcessor] = await Promise.all([
+    listTasks(),
+    pipelineStatus(),
+    readLastProcessorState(),
+  ]);
+  return { tasks, pipelines, lastProcessor };
 }

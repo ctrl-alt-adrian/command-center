@@ -10,6 +10,7 @@ export const VAULT_ROOT = process.env.VAULT_ROOT ?? path.join(COMMAND_CENTER_ROO
 export const LEGACY_SESSIONS_ROOT =
   process.env.LEGACY_SESSIONS_ROOT ?? path.join(process.env.HOME ?? "", "Documents", "rolenext", "sessions");
 export const LOGS_DIR = path.join(COMMAND_CENTER_ROOT, "logs");
+export const PROCESSOR_STATE_FILE = path.join(LOGS_DIR, "processor-state.json");
 
 export function taskDir(id: string): string {
   return path.join(TASKS_DIR, id);

@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import type { PhaseConfig, PipelineConfig, Task } from "./types.ts";
-import { DEFAULT_BACKPRESSURE_CAP, DEFAULT_RETRY_MAX } from "./types.ts";
+import { DEFAULT_BACKPRESSURE_CAP, DEFAULT_PROCESSOR_PER_TICK_CAP, DEFAULT_RETRY_MAX } from "./types.ts";
 import { getPipeline, listPipelines, nextPhase, getPhase, isFirstPhase } from "./registry.ts";
 import {
   appendAttempt,
@@ -11,7 +11,7 @@ import {
   updateTask,
   writePhaseOutput,
 } from "./tasks.ts";
-import { phaseDir, taskDir } from "./paths.ts";
+import { LOGS_DIR, PROCESSOR_STATE_FILE, phaseDir, taskDir } from "./paths.ts";
 import { logEvent, consoleLog } from "./log.ts";
 import { nowIso } from "./utils.ts";
 
@@ -20,20 +20,62 @@ export interface ProcessorResult {
   byPipeline: Record<string, number>;
   paused: number;
   resumed: number;
+  deferred: number;
+}
+
+function globalPerTickCap(): number {
+  const raw = process.env.PROCESSOR_PER_TICK_CAP;
+  if (!raw) return DEFAULT_PROCESSOR_PER_TICK_CAP;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_PROCESSOR_PER_TICK_CAP;
+}
+
+async function persistProcessorState(result: ProcessorResult): Promise<void> {
+  try {
+    await fs.mkdir(LOGS_DIR, { recursive: true });
+    await fs.writeFile(
+      PROCESSOR_STATE_FILE,
+      JSON.stringify({ ...result, lastRunAt: nowIso() }, null, 2),
+      "utf-8",
+    );
+  } catch {
+    // best-effort; processor state is observability, not correctness
+  }
+}
+
+export async function readLastProcessorState(): Promise<
+  (ProcessorResult & { lastRunAt: string }) | null
+> {
+  try {
+    const raw = await fs.readFile(PROCESSOR_STATE_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 /** Main entry. Returns counts. Safe to call when no work exists. */
 export async function runProcessor(): Promise<ProcessorResult> {
-  const result: ProcessorResult = { processed: 0, byPipeline: {}, paused: 0, resumed: 0 };
+  const result: ProcessorResult = { processed: 0, byPipeline: {}, paused: 0, resumed: 0, deferred: 0 };
 
   // Step 1: try to resume paused_backpressure tasks (cap may have cleared).
+  // Resume happens regardless of the per-tick cap — resumed tasks just take
+  // their FIFO place in the pending queue and may or may not dispatch this tick.
   const resumedCount = await tryResumePaused();
   result.resumed = resumedCount;
 
-  // Step 2: dispatch pending tasks one at a time.
-  const tasks = await listTasks();
-  for (const task of tasks) {
-    if (task.status !== "pending") continue;
+  // Step 2: dispatch pending tasks in FIFO order (oldest createdAt first),
+  // honoring the per-tick cap.
+  const allTasks = await listTasks();
+  const pending = allTasks
+    .filter((t) => t.status === "pending")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  const globalCap = globalPerTickCap();
+  let globalUsed = 0;
+  const perPipelineUsed: Record<string, number> = {};
+
+  for (const task of pending) {
     const pipeline = getPipeline(task.pipelineId);
     if (!pipeline) {
       await fail(task, `unknown pipeline: ${task.pipelineId}`);
@@ -42,6 +84,19 @@ export async function runProcessor(): Promise<ProcessorResult> {
     const phase = getPhase(pipeline, task.phaseId);
     if (!phase) {
       await fail(task, `unknown phase: ${task.pipelineId}/${task.phaseId}`);
+      continue;
+    }
+
+    // Per-tick cap check. Pipelines declaring `perTickCap` get an independent
+    // budget; pipelines without an override share the global pool.
+    if (pipeline.perTickCap != null) {
+      const used = perPipelineUsed[pipeline.id] ?? 0;
+      if (used >= pipeline.perTickCap) {
+        result.deferred++;
+        continue;
+      }
+    } else if (globalUsed >= globalCap) {
+      result.deferred++;
       continue;
     }
 
@@ -57,8 +112,14 @@ export async function runProcessor(): Promise<ProcessorResult> {
     await runPhase(pipeline, phase, task);
     result.processed++;
     result.byPipeline[pipeline.id] = (result.byPipeline[pipeline.id] ?? 0) + 1;
+    if (pipeline.perTickCap != null) {
+      perPipelineUsed[pipeline.id] = (perPipelineUsed[pipeline.id] ?? 0) + 1;
+    } else {
+      globalUsed++;
+    }
   }
 
+  await persistProcessorState(result);
   return result;
 }
 

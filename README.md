@@ -44,6 +44,21 @@ logs/                # diagnostics
 
 That's it — `core/lib/` is never modified.
 
+## Throttling
+
+The processor caps how many pending tasks dispatch in one `/api/cron` tick so a
+single fan-out (e.g. marketing's 53-task discovery) can't wedge the dashboard
+for hours.
+
+- Global default: `PROCESSOR_PER_TICK_CAP=3` (env var; see `.env.example`).
+- Per-pipeline override: set `perTickCap` in `pipelines/<name>/pipeline.config.ts`.
+  Pipelines with an override run on their own independent budget; pipelines
+  without share the global pool.
+- Current overrides: `software-factory-housekeeping: 50` (pure file ops),
+  `competitors: 5` (slow yt-dlp scrape, no claude spend).
+- Pending tasks beyond the cap stay `pending` and surface on `/tasks` as
+  "N deferred to next tick". They're dispatched in `createdAt` order (FIFO).
+
 ## Setup
 
 ```bash

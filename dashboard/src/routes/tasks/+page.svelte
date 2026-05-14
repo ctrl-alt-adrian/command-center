@@ -93,6 +93,16 @@
     </div>
   </div>
 
+  {#if data.lastProcessor && data.lastProcessor.deferred > 0}
+    <div class="bg-warn/10 border border-warn/40 rounded p-3 text-sm">
+      <strong class="text-warn">{data.lastProcessor.deferred} task{data.lastProcessor.deferred === 1 ? "" : "s"} deferred to next tick</strong>
+      <span class="text-muted ml-2">
+        last /api/cron ran {new Date(data.lastProcessor.lastRunAt).toLocaleTimeString()}
+        · processed {data.lastProcessor.processed}
+      </span>
+    </div>
+  {/if}
+
   {#if cappedPipelines.length > 0}
     <div class="bg-danger/10 border border-danger rounded p-3 text-sm">
       <strong class="text-danger">Backpressure cap reached</strong>

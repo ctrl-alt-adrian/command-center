@@ -10,6 +10,8 @@ export const competitorsPipeline: PipelineConfig = {
     "Writes a six-tab snapshot to signals/competitors/<date>.json consumed by both " +
     "/competitors and marketing discovery's External Signals subagent.",
   backpressureCap: 5,
+  // yt-dlp scrape per task is slow but cheap (no claude spend).
+  perTickCap: 5,
   cronSchedule: "0 10 * * *",
   phases: [
     {

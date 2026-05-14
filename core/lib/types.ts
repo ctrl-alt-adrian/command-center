@@ -52,6 +52,13 @@ export interface PipelineConfig {
   description?: string;
   phases: PhaseConfig[];
   backpressureCap?: number;
+  /**
+   * Maximum number of pending tasks for this pipeline to dispatch in one
+   * processor tick. When set, this pipeline has its own independent budget.
+   * When unset, the pipeline shares the global `PROCESSOR_PER_TICK_CAP` pool
+   * with every other pipeline that also has no override.
+   */
+  perTickCap?: number;
   cronSchedule?: string;
 }
 
@@ -82,3 +89,4 @@ export interface Task {
 export const DEFAULT_BACKPRESSURE_CAP = 5;
 export const DEFAULT_RETRY_MAX = 3;
 export const DEFAULT_TIMEOUT_MS = 120_000;
+export const DEFAULT_PROCESSOR_PER_TICK_CAP = 3;
