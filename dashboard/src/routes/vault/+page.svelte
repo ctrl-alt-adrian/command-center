@@ -10,7 +10,6 @@
   });
 
   async function clearFailed() {
-    if (!confirm(`Remove ${data.failedCount} failed vault-nuggets task(s)? This is irreversible.`)) return;
     await fetch("/api/tasks/clear", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -20,7 +19,6 @@
   }
 
   async function rerunFailed() {
-    if (!confirm(`Re-queue ${data.failedCount} failed vault-nuggets task(s)?`)) return;
     await fetch("/api/tasks/rerun", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -51,14 +49,6 @@
 
   async function runExtract() {
     if (running) return;
-    const ok = confirm(
-      "Run nuggets extract now?\n\n" +
-        "Scans new session exports + build-journal entries, calls claude -p " +
-        "(real token spend), dedupes against the live vault, and stages " +
-        "candidate atomic notes for your review.\n\n" +
-        "Continue?",
-    );
-    if (!ok) return;
     running = true;
     try {
       const res = await fetch("/api/tasks", {

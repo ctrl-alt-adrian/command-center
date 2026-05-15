@@ -3,8 +3,8 @@
   let { children } = $props();
 </script>
 
-<div class="min-h-screen flex">
-  <aside class="w-56 shrink-0 bg-sidebar border-r border-border p-4 flex flex-col gap-1 text-sm">
+<div class="h-screen flex overflow-hidden">
+  <aside class="w-56 shrink-0 bg-sidebar border-r border-border p-4 flex flex-col gap-1 text-sm h-screen sticky top-0 overflow-y-auto">
     <h1 class="text-foreground font-semibold mb-4 text-lg">Command Center</h1>
     <a href="/" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Overview</a>
     <a href="/tasks" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">Tasks</a>
@@ -19,7 +19,7 @@
     <a href="/rolenext" class="px-3 py-2 rounded hover:bg-card text-muted hover:text-foreground">RoleNext</a>
     <div class="mt-auto text-xs text-muted px-3">all 6 phases · port 3001</div>
   </aside>
-  <main class="flex-1 min-w-0 p-6">
+  <main class="flex-1 min-w-0 p-6 overflow-y-auto h-screen">
     {@render children()}
   </main>
 </div>

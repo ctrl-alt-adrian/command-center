@@ -40,5 +40,9 @@ export async function runWriteHandoff(task: Task, ctx: PhaseContext): Promise<Ph
   const handoffPath = await writeHandoff(ctx.outputDir, body);
   ctx.log("handoff-written", { path: handoffPath, length: body.length });
 
-  return { output: { handoffPath, handoffLength: body.length } };
+  // Embed the FULL handoff content in the output so the processor's input merge
+  // carries it forward to fix/verify/pr/post-mortem. This decouples downstream
+  // phases from this task's filesystem dir — clearing completed tasks no longer
+  // breaks the chain. handoffPath stays in output for debugging.
+  return { output: { handoffPath, handoffLength: body.length, handoffBody: body } };
 }

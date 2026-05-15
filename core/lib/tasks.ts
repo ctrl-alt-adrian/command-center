@@ -4,6 +4,8 @@ import type { Task, TaskStatus, TaskAttempt } from "./types.ts";
 import { TASKS_DIR, taskDir, taskFile, phaseDir } from "./paths.ts";
 import { generateId, nowIso } from "./utils.ts";
 import { withFileLock } from "./lock.ts";
+import { ttlCache } from "./cache.ts";
+import { readJsonOrNull } from "./io.ts";
 
 export interface CreateTaskInput {
   pipelineId: string;
@@ -29,30 +31,23 @@ export async function createTask(opts: CreateTaskInput): Promise<Task> {
   };
   await fs.mkdir(taskDir(id), { recursive: true });
   await fs.writeFile(taskFile(id), JSON.stringify(task, null, 2), "utf-8");
+  tasksCache.bust();
   return task;
 }
 
 export async function getTask(id: string): Promise<Task | null> {
-  try {
-    const raw = await fs.readFile(taskFile(id), "utf-8");
-    return JSON.parse(raw) as Task;
-  } catch {
-    return null;
-  }
+  return readJsonOrNull<Task>(taskFile(id));
 }
 
-export async function listTasks(): Promise<Task[]> {
+async function listTasksUncached(): Promise<Task[]> {
   let entries: string[];
   try {
     entries = await fs.readdir(TASKS_DIR);
   } catch {
     return [];
   }
-  const tasks: Task[] = [];
-  for (const e of entries) {
-    const t = await getTask(e);
-    if (t) tasks.push(t);
-  }
+  const loaded = await Promise.all(entries.map((e) => getTask(e)));
+  const tasks = loaded.filter((t): t is Task => t !== null);
   // Sort: running, pending, needs_review, paused (both kinds), failed, completed, cleared_stale
   const weight: Record<TaskStatus, number> = {
     running: 0,
@@ -72,6 +67,16 @@ export async function listTasks(): Promise<Task[]> {
   return tasks;
 }
 
+const tasksCache = ttlCache(listTasksUncached, 2000);
+
+export function bustTasksCache(): void {
+  tasksCache.bust();
+}
+
+export async function listTasks(): Promise<Task[]> {
+  return tasksCache.get();
+}
+
 export async function listTasksByPipeline(pipelineId: string): Promise<Task[]> {
   const all = await listTasks();
   return all.filter((t) => t.pipelineId === pipelineId);
@@ -86,6 +91,7 @@ export async function updateTask(
     if (!task) return null;
     Object.assign(task, updates, { updatedAt: nowIso() });
     await fs.writeFile(taskFile(id), JSON.stringify(task, null, 2), "utf-8");
+    tasksCache.bust();
     return task;
   });
 }
@@ -97,11 +103,13 @@ export async function appendAttempt(id: string, attempt: TaskAttempt): Promise<v
     task.attempts.push(attempt);
     task.updatedAt = nowIso();
     await fs.writeFile(taskFile(id), JSON.stringify(task, null, 2), "utf-8");
+    tasksCache.bust();
   });
 }
 
 export async function deleteTask(id: string): Promise<void> {
   await fs.rm(taskDir(id), { recursive: true, force: true });
+  tasksCache.bust();
 }
 
 export async function writePhaseOutput(

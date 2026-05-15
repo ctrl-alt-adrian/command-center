@@ -103,6 +103,32 @@
         Gate fail reason: <code>{data.task.gateFailReason}</code>
       </div>
     {/if}
+
+    {#if data.task.error}
+      <div class="text-sm border-l-2 border-danger pl-3 space-y-1">
+        <div class="text-danger font-semibold">Phase error</div>
+        <pre class="text-xs bg-sidebar border border-border rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">{data.task.error}</pre>
+      </div>
+    {/if}
+
+    {#if data.failingAttempts.length > 0}
+      <details class="text-sm">
+        <summary class="cursor-pointer text-muted hover:text-foreground">
+          ⚠ {data.failingAttempts.length} failing attempt{data.failingAttempts.length === 1 ? "" : "s"}
+        </summary>
+        <ol class="mt-2 space-y-2">
+          {#each data.failingAttempts as a, i}
+            <li class="border-l-2 border-danger/40 pl-3 space-y-1">
+              <div class="text-xs text-muted">
+                attempt {i + 1} · <span class="font-mono">{a.phaseId}</span> · {a.outcome}
+                · <span class="font-mono">{formatDateTime(a.finishedAt ?? a.startedAt)}</span>
+              </div>
+              <pre class="text-xs bg-sidebar border border-border rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">{a.reason ?? "(no reason recorded)"}</pre>
+            </li>
+          {/each}
+        </ol>
+      </details>
+    {/if}
   </header>
 
   <!-- Phase timeline -->

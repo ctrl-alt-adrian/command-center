@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import Failures from "$lib/Failures.svelte";
 
   let { data } = $props();
 
@@ -11,7 +12,10 @@
 
 <div class="space-y-4">
   <h2 class="text-2xl font-semibold">Overview</h2>
-  <p class="text-muted text-sm">Phase 1 scaffold. Pipelines registered:</p>
+
+  <Failures failures={data.failures} title="Recent failures" />
+
+  <p class="text-muted text-sm">Pipelines registered:</p>
   <ul class="space-y-2">
     {#each data.pipelines as p}
       <li>

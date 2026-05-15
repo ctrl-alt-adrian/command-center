@@ -13,7 +13,6 @@
   });
 
   async function clearFailed() {
-    if (!confirm(`Remove ${data.failedCount} failed competitors task(s)? This is irreversible.`)) return;
     await fetch("/api/tasks/clear", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -23,7 +22,6 @@
   }
 
   async function rerunFailed() {
-    if (!confirm(`Re-queue ${data.failedCount} failed competitors task(s)?`)) return;
     await fetch("/api/tasks/rerun", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -34,13 +32,6 @@
 
   async function runScrape() {
     if (running) return;
-    const ok = confirm(
-      "Run competitors scrape now?\n\n" +
-        "Fetches recent uploads from 15 tracked channels and runs ~22 niche queries " +
-        "via yt-dlp. No claude tokens. Takes ~2-5 minutes.\n\n" +
-        "Continue?",
-    );
-    if (!ok) return;
     running = true;
     try {
       const res = await fetch("/api/tasks", {

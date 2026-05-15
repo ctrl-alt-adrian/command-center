@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import yaml from "js-yaml";
 import { VAULT_ROOT, LEGACY_SESSIONS_ROOT } from "./paths.ts";
+import { ttlCache } from "./cache.ts";
 
 export const PILLARS = [
   "mapping",
@@ -147,21 +148,28 @@ async function walkDir(dir: string, into: string[] = []): Promise<string[]> {
   return into;
 }
 
+async function listNotesUncached(root: string, pillar?: Pillar | string): Promise<VaultNote[]> {
+  const dir = pillar ? path.join(root, pillar) : root;
+  const files = await walkDir(dir);
+  const known = new Set<string>(PILLARS);
+  const loaded = await Promise.all(files.map((f) => readNote(f, root)));
+  // A note's "pillar" is its top-level directory under VAULT_ROOT. Anything
+  // sitting at the root (vault/README.md) or in an unknown dir isn't a note.
+  return loaded.filter((n): n is VaultNote => n !== null && known.has(n.pillar));
+}
+
+const defaultNotesCache = ttlCache(() => listNotesUncached(VAULT_ROOT), 5000);
+
+export function bustNotesCache(): void {
+  defaultNotesCache.bust();
+}
+
 export async function listNotes(opts: { pillar?: Pillar | string; vaultRoot?: string } = {}): Promise<VaultNote[]> {
   const root = opts.vaultRoot ?? VAULT_ROOT;
-  const dir = opts.pillar ? path.join(root, opts.pillar) : root;
-  const files = await walkDir(dir);
-  const out: VaultNote[] = [];
-  const known = new Set<string>(PILLARS);
-  for (const f of files) {
-    const n = await readNote(f, root);
-    if (!n) continue;
-    // A note's "pillar" is its top-level directory under VAULT_ROOT. Anything
-    // sitting at the root (vault/README.md) or in an unknown dir isn't a note.
-    if (!known.has(n.pillar)) continue;
-    out.push(n);
-  }
-  return out;
+  // Cache only the common case (default root, all pillars); pillar-scoped or
+  // alternate-root scans are rare enough that bypassing the cache is fine.
+  if (root === VAULT_ROOT && !opts.pillar) return defaultNotesCache.get();
+  return listNotesUncached(root, opts.pillar);
 }
 
 export interface ResolvedWikilink {
@@ -197,9 +205,9 @@ export async function resolveWikilinks(notes: VaultNote[]): Promise<ResolvedWiki
   return out;
 }
 
-export async function listOrphanLinks(): Promise<ResolvedWikilink[]> {
-  const notes = await listNotes();
-  const resolved = await resolveWikilinks(notes);
+export async function listOrphanLinks(notes?: VaultNote[]): Promise<ResolvedWikilink[]> {
+  const allNotes = notes ?? (await listNotes());
+  const resolved = await resolveWikilinks(allNotes);
   return resolved.filter((r) => r.resolved === null);
 }
 

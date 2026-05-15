@@ -1,5 +1,6 @@
 import { loadLatest, listArchive } from "../../../../pipelines/competitors/lib/scrape.ts";
 import { listTasksByPipeline } from "../../../../core/lib/tasks.ts";
+import { failedCount } from "$lib/failures";
 
 export async function load() {
   const [snapshot, archive, tasks] = await Promise.all([
@@ -7,6 +8,5 @@ export async function load() {
     listArchive().catch(() => []),
     listTasksByPipeline("competitors"),
   ]);
-  const failedCount = tasks.filter((t) => t.status === "failed" || t.status === "cleared_stale").length;
-  return { snapshot, archive, failedCount };
+  return { snapshot, archive, failedCount: failedCount(tasks) };
 }

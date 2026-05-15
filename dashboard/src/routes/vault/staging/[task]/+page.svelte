@@ -35,7 +35,6 @@
     if (bulking) return;
     const n = counts.pending;
     if (n === 0) return;
-    if (!confirm(`Approve all ${n} pending candidate(s)? Existing approvals/rejections are kept as-is.`)) return;
     bulking = true;
     try {
       const res = await fetch(`/api/vault/staging/${data.taskId}/bulk`, {
@@ -53,10 +52,6 @@
 
   async function finalize() {
     if (finalizing) return;
-    if (counts.pending > 0) {
-      const ok = confirm(`${counts.pending} candidate(s) still pending. Finalize anyway? They'll be left in staging.`);
-      if (!ok) return;
-    }
     finalizing = true;
     try {
       const res = await fetch(`/api/tasks/${data.taskId}/approve`, { method: "POST" });

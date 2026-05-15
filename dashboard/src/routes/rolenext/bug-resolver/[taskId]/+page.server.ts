@@ -5,6 +5,7 @@ import { marked } from "marked";
 import DOMPurify from "isomorphic-dompurify";
 import { getTask } from "../../../../../../core/lib/tasks.ts";
 import { phaseDir } from "../../../../../../core/lib/paths.ts";
+import { readJsonOrNull } from "../../../../../../core/lib/io.ts";
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -27,39 +28,28 @@ interface PhaseSlice {
   log: string | null;
 }
 
-async function readJsonOrNull(p: string): Promise<unknown | null> {
-  try {
-    return JSON.parse(await fs.readFile(p, "utf-8"));
-  } catch {
-    return null;
-  }
-}
-
 async function readPhaseSlice(taskId: string, phaseId: string): Promise<PhaseSlice> {
   const dir = phaseDir(taskId, phaseId);
-  let entries: { name: string; size: number }[] = [];
-  let outputJson: unknown | null = null;
-  let log: string | null = null;
+  let dirents: import("fs").Dirent[];
   try {
-    const dirents = await fs.readdir(dir, { withFileTypes: true });
-    for (const d of dirents) {
-      if (!d.isFile()) continue;
-      const full = path.join(dir, d.name);
-      const stat = await fs.stat(full).catch(() => null);
-      entries.push({ name: d.name, size: stat?.size ?? 0 });
-    }
+    dirents = await fs.readdir(dir, { withFileTypes: true });
   } catch {
     return { phaseId, exists: false, artifacts: [], outputJson: null, log: null };
   }
-  // Try to surface the meta.json (the structured phase output the processor writes).
-  outputJson = await readJsonOrNull(path.join(dir, "meta.json"));
-  // Surface make-ci.log if present.
-  try {
-    log = await fs.readFile(path.join(dir, "make-ci.log"), "utf-8");
-  } catch {
-    log = null;
-  }
-  return { phaseId, exists: true, artifacts: entries, outputJson, log };
+  const fileEntries = dirents.filter((d) => d.isFile());
+  const [stats, outputJson, log] = await Promise.all([
+    Promise.all(
+      fileEntries.map((d) =>
+        fs.stat(path.join(dir, d.name)).then(
+          (s) => ({ name: d.name, size: s.size }),
+          () => ({ name: d.name, size: 0 }),
+        ),
+      ),
+    ),
+    readJsonOrNull(path.join(dir, "meta.json")),
+    fs.readFile(path.join(dir, "make-ci.log"), "utf-8").catch(() => null),
+  ]);
+  return { phaseId, exists: true, artifacts: stats, outputJson, log };
 }
 
 export async function load({ params }) {
@@ -69,10 +59,7 @@ export async function load({ params }) {
     throw error(400, `task ${params.taskId} is not in ${PIPELINE_ID}`);
   }
 
-  const phaseSlices: PhaseSlice[] = [];
-  for (const ph of PHASE_ORDER) {
-    phaseSlices.push(await readPhaseSlice(task.id, ph));
-  }
+  const phaseSlices = await Promise.all(PHASE_ORDER.map((ph) => readPhaseSlice(task.id, ph)));
 
   // Render handoff.md (if present) to HTML for inline display.
   let handoffHtml: string | null = null;
@@ -92,6 +79,10 @@ export async function load({ params }) {
   const prUrl = (task.output as { prUrl?: string } | undefined)?.prUrl ?? null;
   const prNumber = prUrl ? Number(prUrl.match(/\/pull\/(\d+)/)?.[1] ?? 0) || null : null;
 
+  const failingAttempts = (task.attempts ?? []).filter(
+    (a) => a.outcome === "error" || a.outcome === "gate_fail",
+  );
+
   return {
     task,
     phaseSlices,
@@ -103,5 +94,6 @@ export async function load({ params }) {
     prUrl,
     prNumber,
     pipelineId: PIPELINE_ID,
+    failingAttempts,
   };
 }

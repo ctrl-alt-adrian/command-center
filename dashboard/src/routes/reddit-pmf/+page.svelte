@@ -10,7 +10,6 @@
   });
 
   async function clearFailed() {
-    if (!confirm(`Remove ${data.failedCount} failed reddit-pmf task(s)? This is irreversible.`)) return;
     await fetch("/api/tasks/clear", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -20,7 +19,6 @@
   }
 
   async function rerunFailed() {
-    if (!confirm(`Re-queue ${data.failedCount} failed reddit-pmf task(s)?`)) return;
     await fetch("/api/tasks/rerun", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -31,14 +29,6 @@
 
   async function runWeek() {
     if (running) return;
-    const ok = confirm(
-      "Run the Reddit PMF pipeline now?\n\n" +
-        "• Scrapes top-of-week posts from 5 subreddits (public JSON, no auth)\n" +
-        "• Calls Claude Sonnet to cluster complaints into 3-7 landing hypotheses (real tokens)\n" +
-        "• Deploy phase: " + (data.deployMode === "vercel" ? "pushes branches to Vercel" : "writes files locally (DRY RUN — VERCEL_TOKEN not set)") + "\n\n" +
-        "Continue?",
-    );
-    if (!ok) return;
     running = true;
     try {
       const res = await fetch("/api/tasks", {

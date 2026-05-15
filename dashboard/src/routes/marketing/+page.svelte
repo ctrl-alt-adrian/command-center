@@ -37,7 +37,6 @@
   }
 
   async function clearFailed() {
-    if (!confirm(`Remove ${data.failedCount} failed marketing task(s)? This is irreversible.`)) return;
     await fetch("/api/tasks/clear", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -47,7 +46,6 @@
   }
 
   async function rerunFailed() {
-    if (!confirm(`Re-queue ${data.failedCount} failed marketing task(s)?`)) return;
     await fetch("/api/tasks/rerun", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -58,13 +56,6 @@
 
   async function runDiscovery() {
     if (running) return;
-    const ok = confirm(
-      "Run marketing discovery now?\n\n" +
-        "This scans the KB, fires claude -p subagents (real token spend), " +
-        "and lands a candidate list in /tasks for your review.\n\n" +
-        "Continue?",
-    );
-    if (!ok) return;
     running = true;
     try {
       const res = await fetch("/api/tasks", {

@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { VAULT_ROOT } from "../../../core/lib/paths.ts";
-import { PILLARS, listNotes } from "../../../core/lib/vault.ts";
+import { PILLARS, listNotes, bustNotesCache } from "../../../core/lib/vault.ts";
 import { stagingDir } from "./paths.ts";
 import { listStagedCandidates, candidateToMarkdown, type Candidate } from "./extract.ts";
 
@@ -91,6 +91,8 @@ export async function runEmbed(taskId: string, outputDir: string): Promise<Embed
     `# Embed\n\nEmbedded ${embedded.length} note(s).\nCreated ${stubsCreated.length} stub(s) for missing wikilink targets.\nSkipped ${skipped.length}.\n`,
     "utf-8",
   );
+
+  if (embedded.length > 0 || stubsCreated.length > 0) bustNotesCache();
 
   return { embedded, stubsCreated, skipped };
 }

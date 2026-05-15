@@ -14,6 +14,7 @@ import {
 import { LOGS_DIR, PROCESSOR_STATE_FILE, phaseDir, taskDir } from "./paths.ts";
 import { logEvent, consoleLog } from "./log.ts";
 import { nowIso } from "./utils.ts";
+import { readJsonOrNull } from "./io.ts";
 
 export interface ProcessorResult {
   processed: number;
@@ -46,12 +47,7 @@ async function persistProcessorState(result: ProcessorResult): Promise<void> {
 export async function readLastProcessorState(): Promise<
   (ProcessorResult & { lastRunAt: string }) | null
 > {
-  try {
-    const raw = await fs.readFile(PROCESSOR_STATE_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  return readJsonOrNull<ProcessorResult & { lastRunAt: string }>(PROCESSOR_STATE_FILE);
 }
 
 /** Main entry. Returns counts. Safe to call when no work exists. */
@@ -360,17 +356,29 @@ export async function rerunTask(id: string): Promise<Task | null> {
 export async function pipelineStatus(): Promise<
   Array<{ id: string; phases: { id: string; gateType: string }[]; backpressureCap: number; counts: Record<string, number> }>
 > {
-  const result = [];
-  for (const p of listPipelines()) {
-    const tasks = await listTasksByPipeline(p.id);
-    const counts: Record<string, number> = {};
-    for (const t of tasks) counts[t.status] = (counts[t.status] ?? 0) + 1;
-    result.push({
-      id: p.id,
-      phases: p.phases.map((ph) => ({ id: ph.id, gateType: ph.gateType })),
-      backpressureCap: p.backpressureCap ?? DEFAULT_BACKPRESSURE_CAP,
-      counts: { needs_review: 0, pending: 0, running: 0, completed: 0, failed: 0, paused_backpressure: 0, paused_user: 0, ...counts },
-    });
+  const allTasks = await listTasks();
+  const byPipeline = new Map<string, Record<string, number>>();
+  for (const t of allTasks) {
+    let counts = byPipeline.get(t.pipelineId);
+    if (!counts) {
+      counts = {};
+      byPipeline.set(t.pipelineId, counts);
+    }
+    counts[t.status] = (counts[t.status] ?? 0) + 1;
   }
-  return result;
+  return listPipelines().map((p) => ({
+    id: p.id,
+    phases: p.phases.map((ph) => ({ id: ph.id, gateType: ph.gateType })),
+    backpressureCap: p.backpressureCap ?? DEFAULT_BACKPRESSURE_CAP,
+    counts: {
+      needs_review: 0,
+      pending: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+      paused_backpressure: 0,
+      paused_user: 0,
+      ...(byPipeline.get(p.id) ?? {}),
+    },
+  }));
 }

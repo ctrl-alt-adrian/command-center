@@ -1,8 +1,9 @@
-import fs from "fs/promises";
 import path from "path";
 import { SIGNALS_DIR } from "../../../../core/lib/paths.ts";
+import { readJsonOrNull } from "../../../../core/lib/io.ts";
 import { loadHypotheses } from "../../../../pipelines/reddit-pmf/lib/hypotheses.ts";
 import { listTasksByPipeline } from "../../../../core/lib/tasks.ts";
+import { failedCount } from "$lib/failures";
 
 interface MetricsLatest {
   date?: string;
@@ -16,12 +17,9 @@ export async function load() {
   ]);
 
   // Latest metrics (stub format)
-  let metricsLatest: MetricsLatest | null = null;
-  try {
-    metricsLatest = JSON.parse(await fs.readFile(path.join(SIGNALS_DIR, "reddit-pmf", "metrics-latest.json"), "utf-8"));
-  } catch {
-    metricsLatest = null;
-  }
+  const metricsLatest = await readJsonOrNull<MetricsLatest>(
+    path.join(SIGNALS_DIR, "reddit-pmf", "metrics-latest.json"),
+  );
 
   // "Links awaiting placement" — live hypotheses deployed in past 7 days with zero clicks
   const sevenDaysAgo = Date.now() - 7 * 86_400_000;
@@ -66,7 +64,7 @@ export async function load() {
     awaitingPlacement: awaitingPlacement.map((h) => ({ id: h.id, name: h.cluster.name, deployUrl: h.deployUrl })),
     runningTasks: tasks.filter((t) => t.status === "running" || t.status === "pending").length,
     lastTaskAt: tasks[0]?.updatedAt ?? null,
-    failedCount: tasks.filter((t) => t.status === "failed" || t.status === "cleared_stale").length,
+    failedCount: failedCount(tasks),
     deployMode: process.env.VERCEL_TOKEN && process.env.VERCEL_PROJECT_ID && process.env.LANDING_REPO_PATH ? "vercel" : "dry_run",
   };
 }

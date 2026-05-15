@@ -11,15 +11,6 @@
 
   async function runDiscovery() {
     if (running) return;
-    const ok = confirm(
-      `Run personal-brand discovery now?\n\n` +
-        `Scans the vault and picks tier-1 framework notes flagged content_ready ` +
-        `with audience not set to product. ` +
-        `Currently ${data.eligibleCount} note(s) match the filter.\n\n` +
-        `Phase A: discovery only — output lands in needs_review for you to inspect. ` +
-        `Continue?`,
-    );
-    if (!ok) return;
     running = true;
     try {
       const res = await fetch("/api/tasks", {

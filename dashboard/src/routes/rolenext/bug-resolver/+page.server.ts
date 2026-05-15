@@ -1,16 +1,14 @@
 import fs from "fs/promises";
 import path from "path";
-import { fileURLToPath } from "url";
 import { marked } from "marked";
 import DOMPurify from "isomorphic-dompurify";
 import { listTasksByPipeline } from "../../../../../core/lib/tasks.ts";
+import { COMMAND_CENTER_ROOT } from "../../../../../core/lib/paths.ts";
+import { parseFrontmatter } from "../../../../../core/lib/vault.ts";
 import type { Task } from "../../../../../core/lib/types.ts";
 import { ROLENEXT_BUG_RESOLVER_CONFIG } from "../../../../../pipelines/rolenext/bug-resolver/pipeline.config.ts";
+import { extractFailures } from "$lib/failures";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// dashboard/src/routes/rolenext/bug-resolver/+page.server.ts → command-center/
-const COMMAND_CENTER_ROOT = path.resolve(__dirname, "..", "..", "..", "..", "..");
 const INCIDENTS_DIR = path.join(COMMAND_CENTER_ROOT, "vault", "incidents");
 const PIPELINE_ID = "rolenext-bug-resolver";
 
@@ -41,47 +39,25 @@ export interface IncidentSummary {
   meta: FrontmatterRecord;
 }
 
-function parseFrontmatter(raw: string): { meta: FrontmatterRecord; body: string } {
-  if (!raw.startsWith("---")) return { meta: {}, body: raw };
-  const end = raw.indexOf("\n---", 3);
-  if (end < 0) return { meta: {}, body: raw };
-  const block = raw.slice(3, end).trim();
-  const body = raw.slice(end + 4).replace(/^\n/, "");
-  const meta: Record<string, unknown> = {};
-  for (const line of block.split("\n")) {
-    const colon = line.indexOf(":");
-    if (colon < 0) continue;
-    const key = line.slice(0, colon).trim();
-    const valueRaw = line.slice(colon + 1).trim();
-    if (valueRaw === "null") meta[key] = null;
-    else if (valueRaw.startsWith("[") && valueRaw.endsWith("]")) {
-      const inner = valueRaw.slice(1, -1).trim();
-      meta[key] = inner.length === 0
-        ? []
-        : inner.split(",").map((s) => s.trim().replace(/^"(.*)"$/, "$1"));
-    } else if (/^-?\d+$/.test(valueRaw)) meta[key] = parseInt(valueRaw, 10);
-    else meta[key] = valueRaw.replace(/^"(.*)"$/, "$1");
-  }
-  return { meta: meta as FrontmatterRecord, body };
-}
-
 async function loadIncidents(): Promise<IncidentSummary[]> {
   const entries = await fs.readdir(INCIDENTS_DIR, { withFileTypes: true }).catch(() => []);
-  const incidents: IncidentSummary[] = [];
-  for (const e of entries) {
-    if (!e.isDirectory()) continue;
-    const pmPath = path.join(INCIDENTS_DIR, e.name, "post-mortem.md");
-    const raw = await fs.readFile(pmPath, "utf-8").catch(() => null);
-    if (!raw) continue;
-    const { meta } = parseFrontmatter(raw);
-    if (meta.type !== "incident") continue;
-    incidents.push({
-      slug: e.name,
-      dir: path.join(INCIDENTS_DIR, e.name),
-      postMortemPath: pmPath,
-      meta,
-    });
-  }
+  const dirs = entries.filter((e) => e.isDirectory());
+  const loaded = await Promise.all(
+    dirs.map(async (e) => {
+      const pmPath = path.join(INCIDENTS_DIR, e.name, "post-mortem.md");
+      const raw = await fs.readFile(pmPath, "utf-8").catch(() => null);
+      if (!raw) return null;
+      const { meta } = parseFrontmatter(raw);
+      if ((meta as FrontmatterRecord).type !== "incident") return null;
+      return {
+        slug: e.name,
+        dir: path.join(INCIDENTS_DIR, e.name),
+        postMortemPath: pmPath,
+        meta: meta as FrontmatterRecord,
+      } satisfies IncidentSummary;
+    }),
+  );
+  const incidents = loaded.filter((i): i is IncidentSummary => i !== null);
   // Sort by date descending.
   incidents.sort((a, b) => (b.meta.date ?? "").localeCompare(a.meta.date ?? ""));
   return incidents;
@@ -157,6 +133,8 @@ export async function load() {
     }),
   );
 
+  const failures = extractFailures(tasks);
+
   return {
     pipelineId: PIPELINE_ID,
     config: {
@@ -167,5 +145,6 @@ export async function load() {
     queue,
     recentPRs,
     incidents: incidentCards,
+    failures,
   };
 }

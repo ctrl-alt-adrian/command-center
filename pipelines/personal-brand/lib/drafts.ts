@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { BRAND_DRAFTS_DIR } from "./paths.ts";
+import { readJson } from "../../../core/lib/io.ts";
 
 export interface BrandDraft {
   platform: string;
@@ -17,12 +18,7 @@ export interface BrandDraftSet {
 }
 
 async function readMeta(dirPath: string): Promise<Partial<BrandDraftSet>> {
-  try {
-    const raw = await fs.readFile(path.join(dirPath, "meta.json"), "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+  return readJson<Partial<BrandDraftSet>>(path.join(dirPath, "meta.json"), {});
 }
 
 async function buildSet(slug: string, dirPath: string): Promise<BrandDraftSet | null> {

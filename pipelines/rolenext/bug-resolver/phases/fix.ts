@@ -8,7 +8,7 @@ import { ROLENEXT_BUG_RESOLVER_CONFIG, type RolenextBugResolverConfig } from "..
 import { createWorktree, worktreePathFor, branchNameFor } from "../lib/worktree.ts";
 import { runFix, runFixRevision } from "../lib/fix-agent.ts";
 import { getPRComments, getPR, type GitHubReviewComment } from "../lib/github.ts";
-import { handoffDirFromTask } from "../lib/handoff.ts";
+import { loadHandoffForTask } from "../lib/handoff.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -59,13 +59,20 @@ async function createRevisionWorktree(
   return wtPath;
 }
 
-/** Load the prior handoff for a revision task by walking up to the most-recent
- *  completed write-handoff task for the same issue. */
+/** Load the prior handoff for a revision task. Prefers any task in the chain
+ *  for this issue that carries `input.handoffBody` (the new embedded path);
+ *  falls back to walking task dirs for the legacy file path. */
 async function loadPriorHandoff(issueNumber: number, ctx: PhaseContext): Promise<string> {
   const tasks = await listTasksByPipeline(PIPELINE_ID);
   const matches = tasks
     .filter((t) => (t.input as { issueNumber?: number }).issueNumber === issueNumber)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // Pass 1: embedded handoffBody on any task in the chain.
+  for (const t of matches) {
+    const body = (t.input as { handoffBody?: string }).handoffBody;
+    if (typeof body === "string" && body.length > 0) return body;
+  }
+  // Pass 2: legacy filesystem lookup for pre-patch tasks still alive.
   for (const t of matches) {
     const handoffPath = path.join(
       path.resolve(ctx.outputDir, "..", "..", t.id, "write-handoff", "handoff.md"),
@@ -162,11 +169,14 @@ export async function runFixPhase(
   }
 
   // --- open mode (default) ---
-  // write-handoff ran on a prior task; its absolute path lives on this task's
-  // input as `handoffPath`. ctx.inputDir would resolve to <current-task>/<prev-phase>/
-  // which doesn't exist when phases chain across tasks.
-  const handoffPath = path.join(handoffDirFromTask(task), "handoff.md");
-  const handoffBody = await fs.readFile(handoffPath, "utf-8");
+  // write-handoff embeds the full markdown content in its output, which the
+  // processor's input-merge carries forward as `task.input.handoffBody`. We
+  // read from input directly so we don't depend on the prior task's dir
+  // existing on disk (it may have been cleared by housekeeping).
+  const { body: handoffBody, source: handoffSource } = await loadHandoffForTask(task);
+  if (handoffSource === "file") {
+    ctx.log("handoff-source-fallback", { note: "read handoff from filesystem; embed-in-input is preferred" });
+  }
   const worktreePath = await createWorktree(cfg.rolenextPath, cfg.worktreeBase, input.issueNumber);
 
   const fix = await runFix({

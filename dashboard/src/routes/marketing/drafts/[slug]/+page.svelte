@@ -107,7 +107,6 @@
       <button
         class="px-3 py-2 text-sm border-b-2 transition-colors {activePlatform === p.platform ? 'border-accent text-foreground' : 'border-transparent text-muted hover:text-foreground'}"
         onclick={() => {
-          if (dirty && !confirm("You have unsaved changes. Switch anyway?")) return;
           selected = p.platform;
         }}
       >

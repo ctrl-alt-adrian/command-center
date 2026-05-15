@@ -1,6 +1,7 @@
 import { discoverBrandCandidates } from "../../../../pipelines/personal-brand/lib/discovery.ts";
 import { getBrandDraftSets } from "../../../../pipelines/personal-brand/lib/drafts.ts";
 import { listTasksByPipeline } from "../../../../core/lib/tasks.ts";
+import { countTasksByStatus } from "$lib/failures";
 
 export async function load() {
   const [eligible, drafts, tasks] = await Promise.all([
@@ -21,6 +22,7 @@ export async function load() {
       output: t.output,
     }));
 
+  const c = countTasksByStatus(tasks);
   return {
     eligibleCount: eligible.length,
     eligiblePreview: eligible.slice(0, 8).map((c) => ({
@@ -32,9 +34,9 @@ export async function load() {
     })),
     draftCount: drafts.length,
     taskCount: tasks.length,
-    needsReview: tasks.filter((t) => t.status === "needs_review").length,
-    runningCount: tasks.filter((t) => t.status === "running").length,
-    failedCount: tasks.filter((t) => t.status === "failed" || t.status === "cleared_stale").length,
+    needsReview: c.needs_review,
+    runningCount: c.running,
+    failedCount: c.failed + c.cleared_stale,
     recentTasks,
   };
 }

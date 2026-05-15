@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
   import { formatDateTime } from "$lib/format";
+  import Failures from "$lib/Failures.svelte";
   let { data } = $props();
 
   $effect(() => {
@@ -111,6 +112,8 @@
   {#if pollResult}
     <div class="text-xs {pollResult.ok ? 'text-ok' : 'text-danger'}">{pollResult.message}</div>
   {/if}
+
+  <Failures failures={data.failures} title="Bug-resolver failures" hidePipelineColumn pipelineId="rolenext-bug-resolver" />
 
   <!-- Queue -->
   <section class="space-y-2">

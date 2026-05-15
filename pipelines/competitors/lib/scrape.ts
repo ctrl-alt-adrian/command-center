@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import yaml from "js-yaml";
 import { SIGNALS_DIR } from "../../../core/lib/paths.ts";
+import { readJsonOrNull } from "../../../core/lib/io.ts";
 import { channelUploads, searchResults } from "./yt-dlp.ts";
 import { upsertChannelHistory, median, distinctDayCount, readChannelState } from "./state.ts";
 import type {
@@ -174,23 +175,16 @@ export async function runScrape(): Promise<ScrapeResult> {
 
 /** Load today's (or most recent) snapshot for the dashboard. */
 export async function loadLatest(): Promise<CompetitorsSnapshot | null> {
-  const latest = path.join(COMPETITORS_DIR, "latest.json");
-  try {
-    return JSON.parse(await fs.readFile(latest, "utf-8")) as CompetitorsSnapshot;
-  } catch {
-    // No latest.json — find newest dated file
-    const entries = await fs.readdir(COMPETITORS_DIR).catch(() => [] as string[]);
-    const dated = entries
-      .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-      .sort()
-      .reverse();
-    if (dated.length === 0) return null;
-    try {
-      return JSON.parse(await fs.readFile(path.join(COMPETITORS_DIR, dated[0]), "utf-8")) as CompetitorsSnapshot;
-    } catch {
-      return null;
-    }
-  }
+  const fromLatest = await readJsonOrNull<CompetitorsSnapshot>(path.join(COMPETITORS_DIR, "latest.json"));
+  if (fromLatest) return fromLatest;
+  // No latest.json — find newest dated file
+  const entries = await fs.readdir(COMPETITORS_DIR).catch(() => [] as string[]);
+  const dated = entries
+    .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
+    .sort()
+    .reverse();
+  if (dated.length === 0) return null;
+  return readJsonOrNull<CompetitorsSnapshot>(path.join(COMPETITORS_DIR, dated[0]));
 }
 
 export async function listArchive(): Promise<Array<{ date: string; path: string }>> {
@@ -203,12 +197,7 @@ export async function listArchive(): Promise<Array<{ date: string; path: string 
 }
 
 export async function loadByDate(date: string): Promise<CompetitorsSnapshot | null> {
-  const p = path.join(COMPETITORS_DIR, `${date}.json`);
-  try {
-    return JSON.parse(await fs.readFile(p, "utf-8")) as CompetitorsSnapshot;
-  } catch {
-    return null;
-  }
+  return readJsonOrNull<CompetitorsSnapshot>(path.join(COMPETITORS_DIR, `${date}.json`));
 }
 
 // Re-export for callers (state module is wired here so the pipeline can introspect)

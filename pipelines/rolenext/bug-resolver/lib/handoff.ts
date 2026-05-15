@@ -4,25 +4,40 @@ import type { Task } from "../../../../core/lib/types.ts";
 import type { InvestigateOutcome, InvestigateResult } from "./investigate-agent.ts";
 
 /**
- * Resolve the directory holding `handoff.md` for the given downstream task.
+ * Resolve the handoff body for a downstream task.
  *
- * The bug-resolver chains its phases across separate tasks (poll-issues →
- * triage → write-handoff → fix → verify → pr → post-mortem). The write-handoff
- * phase writes `handoff.md` into its OWN task's output dir and stores the
- * absolute path on the next task's input as `handoffPath`. Every subsequent
- * phase reads through this helper so they don't reinvent the (path-fragile,
- * task-id-blind) "../write-handoff" relative lookup that broke fix.ts.
+ * Primary path: read `task.input.handoffBody` — the write-handoff phase embeds
+ * the full markdown there so the body travels via the processor's input-merge,
+ * not via the filesystem. This is the source of truth.
+ *
+ * Fallback: in-flight tasks created BEFORE the embedding patch only have
+ * `task.input.handoffPath`. We still try the file as a graceful degradation —
+ * but log a deprecation hint via the returned `source` so callers can surface it.
+ *
+ * Throws when neither is available.
  */
-export function handoffDirFromTask(task: Task): string {
+export async function loadHandoffForTask(task: Task): Promise<{ body: string; source: "input" | "file" }> {
   const input = task.input as Record<string, unknown>;
-  const handoffPath = typeof input.handoffPath === "string" ? input.handoffPath : null;
-  if (!handoffPath) {
-    throw new Error(
-      `handoffDirFromTask: task ${task.id} (phase ${task.phaseId}) has no input.handoffPath — ` +
-        `write-handoff phase output should have propagated it via advanceOrComplete's input merge`,
-    );
+  const embedded = typeof input.handoffBody === "string" ? input.handoffBody : null;
+  if (embedded && embedded.length > 0) {
+    return { body: embedded, source: "input" };
   }
-  return path.dirname(handoffPath);
+  const handoffPath = typeof input.handoffPath === "string" ? input.handoffPath : null;
+  if (handoffPath) {
+    try {
+      const body = await fs.readFile(handoffPath, "utf-8");
+      return { body, source: "file" };
+    } catch (err) {
+      throw new Error(
+        `loadHandoffForTask: task ${task.id} (phase ${task.phaseId}) has handoffPath=${handoffPath} ` +
+          `but the file is gone (likely the write-handoff task's dir was cleared). Underlying error: ${(err as Error).message}`,
+      );
+    }
+  }
+  throw new Error(
+    `loadHandoffForTask: task ${task.id} (phase ${task.phaseId}) has neither input.handoffBody ` +
+      `nor input.handoffPath — write-handoff phase output didn't propagate via advanceOrComplete's input merge`,
+  );
 }
 
 export interface HandoffInput {

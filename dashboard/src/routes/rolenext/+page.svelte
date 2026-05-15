@@ -35,9 +35,7 @@
                   <span>·</span>
                   <span>cron <code>{p.cronSchedule}</code></span>
                   <span>·</span>
-                  <span>repo <code>{p.repo}</code></span>
-                  <span>·</span>
-                  <span>browser repro: <code>{p.enableBrowserRepro ? "on" : "off"}</code></span>
+                  <span>{p.meta}</span>
                 </div>
               </div>
               <div class="text-right text-xs">

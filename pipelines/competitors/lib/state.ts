@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { SIGNALS_DIR } from "../../../core/lib/paths.ts";
+import { readJsonOrNull, writeJson } from "../../../core/lib/io.ts";
 import type { ChannelState, ChannelStateRecord } from "./types.ts";
 
 export const STATE_DIR = path.join(SIGNALS_DIR, "competitors", "state");
@@ -10,17 +11,12 @@ function statePath(channelId: string): string {
 }
 
 export async function readChannelState(channelId: string): Promise<ChannelState | null> {
-  try {
-    const raw = await fs.readFile(statePath(channelId), "utf-8");
-    return JSON.parse(raw) as ChannelState;
-  } catch {
-    return null;
-  }
+  return readJsonOrNull<ChannelState>(statePath(channelId));
 }
 
 export async function writeChannelState(state: ChannelState): Promise<void> {
   await fs.mkdir(STATE_DIR, { recursive: true });
-  await fs.writeFile(statePath(state.channelId), JSON.stringify(state, null, 2), "utf-8");
+  await writeJson(statePath(state.channelId), state);
 }
 
 export interface UpsertOptions {

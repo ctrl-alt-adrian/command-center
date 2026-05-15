@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { SIGNALS_DIR } from "./paths.ts";
 import type { Signal, SignalSnapshot } from "./types.ts";
-import { safeReaddir } from "./files.ts";
+import { safeReaddir } from "../../../core/lib/io.ts";
 
 export async function getLatestSignals(): Promise<SignalSnapshot | null> {
   const dirs = await safeReaddir(SIGNALS_DIR);

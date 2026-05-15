@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { DRAFTS_DIR } from "./paths.ts";
 import type { Draft, DraftSet, DraftStatus } from "./types.ts";
-import { readJson, writeJson, safeReaddir } from "./files.ts";
+import { readJson, writeJson, safeReaddir } from "../../../core/lib/io.ts";
 
 async function readStatusFile(
   dateDir: string

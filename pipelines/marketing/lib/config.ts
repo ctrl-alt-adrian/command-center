@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { MARKETING_DIR } from "./paths.ts";
 import { PLATFORMS, type Platform } from "./constants.ts";
-import { readJson } from "./files.ts";
+import { readJson } from "../../../core/lib/io.ts";
 
 const CONFIG_PATH = path.join(MARKETING_DIR, "config.json");
 

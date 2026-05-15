@@ -6,7 +6,7 @@ import { diffAgainstMain, worktreePathFor } from "../lib/worktree.ts";
 import { scanWritePolicy, type SoftBanHit } from "../lib/verify/write-policy.ts";
 import { checkRegressionTests } from "../lib/verify/regression-test.ts";
 import { runMakeCi, type MakeCiResult } from "../lib/verify/make-ci.ts";
-import { appendAttemptFailure, handoffDirFromTask, readHandoff, writeHandoff } from "../lib/handoff.ts";
+import { appendAttemptFailure, loadHandoffForTask } from "../lib/handoff.ts";
 import { runFix } from "../lib/fix-agent.ts";
 
 interface VerifyInput {
@@ -40,6 +40,9 @@ interface VerifyOutput extends Record<string, unknown> {
   attempts: AttemptRecord[];
   fixAttemptsUsed: number;
   worktreePath: string;
+  /** Final handoff body after the (possibly retried) fix loop. Propagates
+   *  forward to pr + post-mortem via the processor's input merge. */
+  handoffBody: string;
 }
 
 interface ChecksContext {
@@ -158,6 +161,7 @@ export async function runVerifyPhase(
         attempts: [blockedAttempt],
         fixAttemptsUsed: 1,
         worktreePath,
+        handoffBody: "",
       } as VerifyOutput,
     };
   }
@@ -185,6 +189,7 @@ export async function runVerifyPhase(
         attempts: [noCommit],
         fixAttemptsUsed: 1,
         worktreePath,
+        handoffBody: "",
       } as VerifyOutput,
     };
   }
@@ -192,10 +197,22 @@ export async function runVerifyPhase(
   // The retry loop: run all checks. If make-ci is the SOLE failure and fix-retries
   // remain, re-invoke the fix agent with the failure log appended to handoff, then
   // re-run all checks. Repeat up to `cfg.fixRetries` times.
+  //
+  // The handoff body lives IN MEMORY for the loop — we no longer write/read it
+  // back through the prior task's filesystem dir (which can be cleared and break
+  // the chain). The final augmented body is persisted into verify.output.handoffBody
+  // so downstream phases (pr, post-mortem) see the failure-annotated version.
   const attempts: AttemptRecord[] = [];
-  // write-handoff ran on a prior task — derive its dir from input.handoffPath
-  // rather than computing relative to ctx.outputDir (which lives under a different task id).
-  const handoffDir = handoffDirFromTask(task);
+  let currentHandoff = "";
+  try {
+    const loaded = await loadHandoffForTask(task);
+    currentHandoff = loaded.body;
+    if (loaded.source === "file") {
+      ctx.log("handoff-source-fallback", { phase: "verify", note: "read from filesystem" });
+    }
+  } catch (err) {
+    ctx.log("handoff-load-failed", { phase: "verify", error: (err as Error).message });
+  }
   // Note: `cfg.fixRetries` counts ADDITIONAL fix attempts beyond the initial one.
   // attempt 1 = initial fix (already done in fix phase). retries 1..fixRetries = more.
   const maxAttempts = 1 + Math.max(0, cfg.fixRetries);
@@ -210,20 +227,19 @@ export async function runVerifyPhase(
     if (attemptNumber >= maxAttempts) break;          // out of retries
     if (!checks.ciOnlyFailure) break;                 // failure isn't CI-fixable
 
-    // 1. Append the failing make-ci output to handoff.md so the next fix attempt sees it.
-    const prior = await readHandoff(handoffDir);
-    if (prior && checks.makeCi) {
-      const updated = appendAttemptFailure(
-        prior,
+    // 1. Append the failing make-ci output to the in-memory handoff so the next
+    //    fix attempt sees it. No filesystem hop.
+    if (currentHandoff && checks.makeCi) {
+      currentHandoff = appendAttemptFailure(
+        currentHandoff,
         attemptNumber,
         `STDOUT (tail)\n${checks.makeCi.stdoutTail}\n\nSTDERR (tail)\n${checks.makeCi.stderrTail}`,
         "The previous fix attempt did not make `make ci` green. Inspect the failure above and adjust your patch.",
       );
-      await writeHandoff(handoffDir, updated);
     }
 
     // 2. Re-invoke the fix agent in the same worktree (it commits on top of prior commits).
-    const newHandoff = (await readHandoff(handoffDir)) ?? "";
+    const newHandoff = currentHandoff;
     ctx.log("fix-retry-starting", { nextAttempt: attemptNumber + 1 });
     const fix = await runFix({
       worktreePath,
@@ -298,6 +314,7 @@ export async function runVerifyPhase(
     attempts,
     fixAttemptsUsed: attemptNumber,
     worktreePath,
+    handoffBody: currentHandoff,
   };
   await fs.writeFile(path.join(ctx.outputDir, "verify.json"), JSON.stringify(out, null, 2), "utf-8");
 

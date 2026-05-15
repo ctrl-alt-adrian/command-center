@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { DRAFTS_DIR } from "./paths.ts";
-import { readJson, safeReaddir } from "./files.ts";
+import { readJson, safeReaddir } from "../../../core/lib/io.ts";
 import {
   BODY_DUPLICATE_THRESHOLD,
   META_DUPLICATE_THRESHOLD,

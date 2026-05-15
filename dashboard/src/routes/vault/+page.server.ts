@@ -2,13 +2,14 @@ import { listNotes, listOrphanLinks, PILLARS } from "../../../../core/lib/vault.
 import { listTasksByPipeline } from "../../../../core/lib/tasks.ts";
 import { listStagedCandidates } from "../../../../pipelines/vault-nuggets/lib/extract.ts";
 import { VAULT_ROOT } from "../../../../core/lib/paths.ts";
+import { failedCount } from "$lib/failures";
 
 export async function load() {
-  const [notes, orphans, tasks] = await Promise.all([
+  const [notes, tasks] = await Promise.all([
     listNotes().catch(() => []),
-    listOrphanLinks().catch(() => []),
     listTasksByPipeline("vault-nuggets"),
   ]);
+  const orphans = await listOrphanLinks(notes).catch(() => []);
 
   const runningExtract = tasks.find((t) => t.status === "running" && t.phaseId === "extract");
 
@@ -61,7 +62,7 @@ export async function load() {
     orphanCount: orphans.length,
     pendingReview: pendingDetails,
     taskCount: tasks.length,
-    failedCount: tasks.filter((t) => t.status === "failed" || t.status === "cleared_stale").length,
+    failedCount: failedCount(tasks),
     runningExtract: runningExtract
       ? { id: runningExtract.id, startedAt: runningExtract.createdAt }
       : null,

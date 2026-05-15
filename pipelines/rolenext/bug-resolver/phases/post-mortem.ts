@@ -1,22 +1,14 @@
 import fs from "fs/promises";
 import path from "path";
-import { fileURLToPath } from "url";
 import type { PhaseContext, PhaseOutput, Task } from "../../../../core/lib/types.ts";
 import { getTask } from "../../../../core/lib/tasks.ts";
+import { VAULT_ROOT } from "../../../../core/lib/paths.ts";
 import { removeWorktree } from "../lib/worktree.ts";
 import { ROLENEXT_BUG_RESOLVER_CONFIG, type RolenextBugResolverConfig } from "../pipeline.config.ts";
-import { handoffDirFromTask, readHandoff } from "../lib/handoff.ts";
+import { loadHandoffForTask } from "../lib/handoff.ts";
 import { buildAndWritePostMortem } from "../lib/post-mortem.ts";
 import type { InvestigateOutcome } from "../lib/investigate-agent.ts";
 import { upsertFingerprint } from "../lib/state.ts";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// vault/ lives at command-center root, three levels above this file's pipeline dir.
-// pipelines/software-factory/rolenext-bug-resolver/phases/post-mortem.ts → command-center/
-const COMMAND_CENTER_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
-const VAULT_ROOT = path.join(COMMAND_CENTER_ROOT, "vault");
 
 interface PostMortemInput {
   issueNumber: number;
@@ -48,10 +40,19 @@ export async function runPostMortemPhase(
 ): Promise<PhaseOutput> {
   const input = task.input as unknown as PostMortemInput;
 
-  // write-handoff ran on a prior task — pull its dir from input.handoffPath
-  // rather than the wrong relative path.
-  const handoffDir = handoffDirFromTask(task);
-  const handoffBody = (await readHandoff(handoffDir)) ?? "";
+  // Prefer the embedded input.handoffBody (carried forward by the processor's
+  // input-merge). Falls back to filesystem read for legacy tasks; tolerates
+  // missing handoff entirely so post-mortem still writes for cleared chains.
+  let handoffBody = "";
+  try {
+    const loaded = await loadHandoffForTask(task);
+    handoffBody = loaded.body;
+    if (loaded.source === "file") {
+      ctx.log("handoff-source-fallback", { phase: "post-mortem", note: "read from filesystem" });
+    }
+  } catch (err) {
+    ctx.log("handoff-load-failed", { phase: "post-mortem", error: (err as Error).message });
+  }
 
   // Pull the parent task to get a stable createdAt (post-mortem task's createdAt
   // would be near-now). For v1, fall back to this task's createdAt if no parent.

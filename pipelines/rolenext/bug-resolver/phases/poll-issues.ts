@@ -62,9 +62,9 @@ async function detectAndSpawnRevisions(
   openBotPRs: GitHubPR[],
   repo: string,
   ctx: PhaseContext,
+  existing: Task[],
 ): Promise<{ prNumber: number; issueNumber: number }[]> {
   const spawned: { prNumber: number; issueNumber: number }[] = [];
-  const existing = await listTasksByPipeline(PIPELINE_ID);
 
   for (const pr of openBotPRs) {
     // Extract the issue number from `Closes #N` in the PR body (any case).
@@ -179,8 +179,8 @@ async function maybeCommentTriggeredRetriage(
   issue: GitHubIssue,
   repo: string,
   ctx: PhaseContext,
+  allTasks: Task[],
 ): Promise<{ fingerprint: string } | null> {
-  const allTasks = await listTasksByPipeline(PIPELINE_ID);
   const tasksForIssue = allTasks
     .filter((t) => (t.input as { issueNumber?: number }).issueNumber === issue.number)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -309,7 +309,7 @@ export async function runPollIssues(
       // semantically equivalent to a reopen. The captain gets to confirm via
       // forced needs_review on the new triage's gate.
       if (dedup.layer === 1) {
-        const retriage = await maybeCommentTriggeredRetriage(issue, cfg.repo, ctx);
+        const retriage = await maybeCommentTriggeredRetriage(issue, cfg.repo, ctx, tasksAfter);
         if (retriage) {
           commentTriggeredRetriage = true;
           dedupForRetriage = { skip: false, fingerprint: retriage.fingerprint };
@@ -334,7 +334,7 @@ export async function runPollIssues(
     let attempt = 1;
     let priorPrUrl: string | null = null;
     if (reopened) {
-      const allForIssue = (await listTasksByPipeline(PIPELINE_ID))
+      const allForIssue = tasksAfter
         .filter((t) => (t.input as { issueNumber?: number }).issueNumber === issue.number)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       const prior = allForIssue[0];
@@ -382,7 +382,7 @@ export async function runPollIssues(
   }
 
   // Auto-detect PR review activity → spawn revision tasks.
-  output.revisionsSpawned = await detectAndSpawnRevisions(openBotPRs, cfg.repo, ctx);
+  output.revisionsSpawned = await detectAndSpawnRevisions(openBotPRs, cfg.repo, ctx, tasksAfter);
 
   ctx.log("poll-issues-done", {
     scanned: output.scanned,

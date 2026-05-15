@@ -7,6 +7,7 @@ import {
   RESERVED_SOFTWARE_FACTORY_PIPELINES,
   softwareFactoryHousekeepingPipeline,
 } from "../../../../pipelines/software-factory/pipeline.config.ts";
+import { failedCount } from "$lib/failures";
 
 interface RecentLog {
   date: string;
@@ -46,6 +47,6 @@ export async function load() {
       : [],
     reserved: RESERVED_SOFTWARE_FACTORY_PIPELINES,
     logs,
-    failedCount: tasks.filter((t) => t.status === "failed" || t.status === "cleared_stale").length,
+    failedCount: failedCount(tasks),
   };
 }
