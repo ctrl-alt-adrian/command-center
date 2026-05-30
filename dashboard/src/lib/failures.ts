@@ -39,13 +39,15 @@ function labelFor(pipelineId: string): string {
   return PIPELINE_LABELS[pipelineId] ?? pipelineId;
 }
 
-/** Pull the most-recent error/gate-fail signal from a task's attempt log. */
+/** Inspect ONLY the most recent attempt. If it's a failure, surface it.
+ *  If a later attempt succeeded (e.g. the task was rewound and retried
+ *  successfully), the task isn't currently failing and shouldn't show in
+ *  the Failures panel as noise. */
 function latestAttemptFailure(attempts: TaskAttempt[]): { outcome: string; reason: string } | null {
-  for (let i = attempts.length - 1; i >= 0; i--) {
-    const a = attempts[i];
-    if ((a.outcome === "error" || a.outcome === "gate_fail") && a.reason) {
-      return { outcome: a.outcome, reason: a.reason };
-    }
+  if (attempts.length === 0) return null;
+  const last = attempts[attempts.length - 1];
+  if ((last.outcome === "error" || last.outcome === "gate_fail") && last.reason) {
+    return { outcome: last.outcome, reason: last.reason };
   }
   return null;
 }

@@ -1,5 +1,5 @@
 # command-center cron entries. Managed by setup.sh — lines matching 'command-center' are replaced on install.
-*/5 * * * * curl -s -X POST http://localhost:3001/api/cron > /dev/null 2>&1  # command-center processor
+* * * * * curl -s -X POST http://localhost:3001/api/cron > /dev/null 2>&1  # command-center processor
 
 # Marketing pipeline. Still manual on command-center; marketing-pipeline at :3000 still owns these slots.
 # 0 10 * * * /home/adrian/Developer/projects/command-center/cron/fetch-signals.sh > /dev/null 2>&1  # command-center marketing signals

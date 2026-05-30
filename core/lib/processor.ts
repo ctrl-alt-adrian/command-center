@@ -1,9 +1,10 @@
 import fs from "fs/promises";
 import type { PhaseConfig, PipelineConfig, Task } from "./types.ts";
 import { DEFAULT_BACKPRESSURE_CAP, DEFAULT_PROCESSOR_PER_TICK_CAP, DEFAULT_RETRY_MAX } from "./types.ts";
-import { getPipeline, listPipelines, nextPhase, getPhase, isFirstPhase } from "./registry.ts";
+import { getPipeline, listPipelines, nextPhase, previousPhase, getPhase, isFirstPhase } from "./registry.ts";
 import {
   appendAttempt,
+  clearFailureAttempts,
   createTask,
   getTask,
   listTasks,
@@ -15,6 +16,8 @@ import { LOGS_DIR, PROCESSOR_STATE_FILE, phaseDir, taskDir } from "./paths.ts";
 import { logEvent, consoleLog } from "./log.ts";
 import { nowIso } from "./utils.ts";
 import { readJsonOrNull } from "./io.ts";
+import { RateLimitError } from "./claude.ts";
+import { isPipelineEnabled, getAllPipelineEnabledMap } from "./pipelineState.ts";
 
 export interface ProcessorResult {
   processed: number;
@@ -71,6 +74,11 @@ export async function runProcessor(): Promise<ProcessorResult> {
   let globalUsed = 0;
   const perPipelineUsed: Record<string, number> = {};
 
+  // Phase 1: plan the dispatch list under the caps. This pass is sync-ish
+  // (only awaits isCapped) and assigns budget without actually running any
+  // phases yet. Phase 2 fires them all in parallel.
+  const dispatch: Array<{ pipeline: PipelineConfig; phase: PhaseConfig; task: Task }> = [];
+
   for (const task of pending) {
     const pipeline = getPipeline(task.pipelineId);
     if (!pipeline) {
@@ -83,8 +91,14 @@ export async function runProcessor(): Promise<ProcessorResult> {
       continue;
     }
 
-    // Per-tick cap check. Pipelines declaring `perTickCap` get an independent
-    // budget; pipelines without an override share the global pool.
+    // Pipeline-level kill switch. When the captain toggles a pipeline off on
+    // /tasks, every pending task in it gets skipped here. Tasks stay in
+    // `pending` so flipping the switch back resumes them naturally.
+    if (!(await isPipelineEnabled(pipeline.id))) {
+      result.deferred++;
+      continue;
+    }
+
     if (pipeline.perTickCap != null) {
       const used = perPipelineUsed[pipeline.id] ?? 0;
       if (used >= pipeline.perTickCap) {
@@ -96,7 +110,6 @@ export async function runProcessor(): Promise<ProcessorResult> {
       continue;
     }
 
-    // Backpressure check on top-of-pipeline tasks only.
     if (isFirstPhase(pipeline, phase.id) && (await isCapped(pipeline))) {
       await updateTask(task.id, { status: "paused_backpressure" });
       result.paused++;
@@ -105,15 +118,24 @@ export async function runProcessor(): Promise<ProcessorResult> {
       continue;
     }
 
-    await runPhase(pipeline, phase, task);
-    result.processed++;
-    result.byPipeline[pipeline.id] = (result.byPipeline[pipeline.id] ?? 0) + 1;
+    dispatch.push({ pipeline, phase, task });
     if (pipeline.perTickCap != null) {
       perPipelineUsed[pipeline.id] = (perPipelineUsed[pipeline.id] ?? 0) + 1;
     } else {
       globalUsed++;
     }
   }
+
+  // Phase 2: run all dispatched phases in parallel. The Claude semaphore in
+  // core/lib/claude.ts is what actually bounds Anthropic API concurrency;
+  // here we just let independent task work overlap instead of blocking the loop.
+  await Promise.all(
+    dispatch.map(async ({ pipeline, phase, task }) => {
+      await runPhase(pipeline, phase, task);
+      result.processed++;
+      result.byPipeline[pipeline.id] = (result.byPipeline[pipeline.id] ?? 0) + 1;
+    }),
+  );
 
   await persistProcessorState(result);
   return result;
@@ -126,6 +148,7 @@ async function tryResumePaused(): Promise<number> {
   for (const t of paused) {
     const pipeline = getPipeline(t.pipelineId);
     if (!pipeline) continue;
+    if (!(await isPipelineEnabled(pipeline.id))) continue;
     if (!(await isCapped(pipeline))) {
       await updateTask(t.id, { status: "pending" });
       resumed++;
@@ -170,6 +193,14 @@ async function runPhase(pipeline: PipelineConfig, phase: PhaseConfig, task: Task
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await appendAttempt(task.id, { phaseId: phase.id, startedAt, finishedAt: nowIso(), outcome: "error", reason: msg });
+    if (err instanceof RateLimitError) {
+      // Don't fail the task — just put it back in the queue. The next
+      // processor tick will retry once the rate limit clears.
+      await updateTask(task.id, { status: "pending" });
+      consoleLog("rate_limited_requeue", { taskId: task.id, phaseId: phase.id });
+      await logEvent("rate_limited_requeue", { taskId: task.id, phaseId: phase.id, reason: msg });
+      return;
+    }
     await fail(task, msg);
   }
 }
@@ -208,9 +239,15 @@ async function applyGate(pipeline: PipelineConfig, phase: PhaseConfig, task: Tas
   }
 
   // Gate failed. Retry policy.
+  // We budget retries via `input.gateRetryCount` because the rewind path
+  // sends the task back to the previous phase and then forward through a
+  // freshly-created next-phase task — so a single task's `retryCount`
+  // wouldn't accumulate across the cycle. Carrying the counter in input
+  // means the budget survives the round-trip.
   const max = phase.retryPolicy?.maxAttempts ?? DEFAULT_RETRY_MAX;
   const fresh = await getTask(task.id);
-  const retries = (fresh?.retryCount ?? 0) + 1;
+  const gateRetryCount = (fresh?.input?.gateRetryCount as number | undefined) ?? 0;
+  const nextGateRetryCount = gateRetryCount + 1;
   await appendAttempt(task.id, {
     phaseId: phase.id,
     startedAt,
@@ -219,14 +256,50 @@ async function applyGate(pipeline: PipelineConfig, phase: PhaseConfig, task: Tas
     reason: result.reason,
   });
 
-  if (retries < max) {
-    await updateTask(task.id, { status: "pending", retryCount: retries, gateFailReason: result.reason });
-    consoleLog("gate_retry", { taskId: task.id, phaseId: phase.id, retries, reason: result.reason });
-    await logEvent("gate_retry", { taskId: task.id, phaseId: phase.id, retries, reason: result.reason });
+  const prev = previousPhase(pipeline, phase.id);
+
+  if (nextGateRetryCount < max && prev) {
+    // Rewind to the previous phase so it can re-produce the artifact this
+    // gate checks (e.g. regenerate drafts after slop-check failure). The
+    // upstream phase auto-passes through to here on the next tick. This
+    // matches the old marketing-pipeline's slop-retry loop and keeps the
+    // gate from re-checking the same unchanged artifact 3× in a row.
+    await updateTask(task.id, {
+      status: "pending",
+      phaseId: prev,
+      retryCount: 0,
+      gateFailReason: "",
+      input: {
+        ...(fresh?.input ?? task.input),
+        gateRetryCount: nextGateRetryCount,
+        gateRetryFeedback: result.reason,
+      },
+    });
+    // Clear stale gate_fail entries so the Failures panel reflects only the
+    // currently-active attempt rather than every prior retry's noise.
+    await clearFailureAttempts(task.id);
+    consoleLog("gate_rewind", { taskId: task.id, fromPhase: phase.id, toPhase: prev, gateRetryCount: nextGateRetryCount, reason: result.reason });
+    await logEvent("gate_rewind", { taskId: task.id, fromPhase: phase.id, toPhase: prev, gateRetryCount: nextGateRetryCount, reason: result.reason });
+  } else if (nextGateRetryCount < max) {
+    // No previous phase to rewind to — fall back to the legacy in-place retry
+    // (the gate re-runs against the same input). Keeps behavior sane for
+    // hypothetical first-phase deterministic gates.
+    await updateTask(task.id, { status: "pending", retryCount: nextGateRetryCount, gateFailReason: result.reason });
+    consoleLog("gate_retry", { taskId: task.id, phaseId: phase.id, retries: nextGateRetryCount, reason: result.reason });
+    await logEvent("gate_retry", { taskId: task.id, phaseId: phase.id, retries: nextGateRetryCount, reason: result.reason });
   } else {
+    if (phase.onExhausted) {
+      try {
+        await phase.onExhausted(fresh ?? task, result.reason ?? "");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        consoleLog("gate_exhausted_cleanup_failed", { taskId: task.id, phaseId: phase.id, error: msg });
+        await logEvent("gate_exhausted_cleanup_failed", { taskId: task.id, phaseId: phase.id, error: msg });
+      }
+    }
     await updateTask(task.id, { status: "needs_review", gateFailReason: result.reason });
-    consoleLog("gate_exhausted", { taskId: task.id, phaseId: phase.id, retries, reason: result.reason });
-    await logEvent("gate_exhausted", { taskId: task.id, phaseId: phase.id, retries, reason: result.reason });
+    consoleLog("gate_exhausted", { taskId: task.id, phaseId: phase.id, retries: nextGateRetryCount, reason: result.reason });
+    await logEvent("gate_exhausted", { taskId: task.id, phaseId: phase.id, retries: nextGateRetryCount, reason: result.reason });
   }
 }
 
@@ -239,7 +312,7 @@ async function advanceOrComplete(pipeline: PipelineConfig, phase: PhaseConfig, t
     return;
   }
   const fresh = await getTask(task.id);
-  const baseInput = { ...task.input, ...(fresh?.output ?? {}), previousTaskId: task.id };
+  const singleAdvanceInput = { ...task.input, ...(fresh?.output ?? {}), previousTaskId: task.id };
 
   if (phase.fanOut) {
     const elements = await phase.fanOut(fresh ?? task);
@@ -249,6 +322,14 @@ async function advanceOrComplete(pipeline: PipelineConfig, phase: PhaseConfig, t
       await logEvent("fanout_empty", { taskId: task.id, nextPhase: next });
       return;
     }
+    // Fan-out children inherit the parent's INPUT plus their own per-child
+    // element + previousTaskId — they intentionally do NOT inherit the
+    // parent's output. Discovery-style outputs (e.g. a 428-element candidates
+    // array) would otherwise get copy-pasted into every child, ballooning
+    // task.json files into hundreds of KB each. If a child phase truly needs
+    // a slice of the parent's output, it should come through the fan-out
+    // element itself (which is what every existing pipeline already does).
+    const fanOutBase = { ...task.input, previousTaskId: task.id };
     // Honor pipeline.fanOutBatchSize: first N go pending, the rest get
     // paused_user so the captain can drain them in controlled batches via
     // the /api/tasks/resume endpoint rather than spawning everything at once.
@@ -260,7 +341,7 @@ async function advanceOrComplete(pipeline: PipelineConfig, phase: PhaseConfig, t
       await createTask({
         pipelineId: pipeline.id,
         phaseId: next,
-        input: { ...baseInput, ...elements[i] },
+        input: { ...fanOutBase, ...elements[i] },
         parentId: task.parentId ?? task.id,
         status,
       });
@@ -277,7 +358,7 @@ async function advanceOrComplete(pipeline: PipelineConfig, phase: PhaseConfig, t
   await createTask({
     pipelineId: pipeline.id,
     phaseId: next,
-    input: baseInput,
+    input: singleAdvanceInput,
     parentId: task.parentId ?? task.id,
     status: "pending",
   });
@@ -292,7 +373,11 @@ async function fail(task: Task, msg: string): Promise<void> {
   await logEvent("failed", { taskId: task.id, msg });
 }
 
-/** Approve a needs_review task — advance to the next phase. */
+/** Approve a needs_review task — advance to the next phase.
+ *  Refuses to bypass a deterministic gate that exhausted its retries: those
+ *  tasks have `gateFailReason` set and the captain must either rerun the
+ *  gate (after fixing the upstream artifact) or reject. Approving past a
+ *  hard gate would publish output the gate said wasn't fit. */
 export async function approveTask(id: string): Promise<Task | null> {
   const task = await getTask(id);
   if (!task || task.status !== "needs_review") return null;
@@ -300,6 +385,11 @@ export async function approveTask(id: string): Promise<Task | null> {
   if (!pipeline) return null;
   const phase = getPhase(pipeline, task.phaseId);
   if (!phase) return null;
+  if (phase.gateType === "deterministic" && task.gateFailReason) {
+    consoleLog("approve_blocked_gate_failed", { taskId: id, phaseId: phase.id });
+    await logEvent("approve_blocked_gate_failed", { taskId: id, phaseId: phase.id });
+    throw new Error(`cannot approve past failed ${phase.id} gate — rerun the gate or reject the task`);
+  }
   await advanceOrComplete(pipeline, phase, task);
   return await getTask(id);
 }
@@ -336,6 +426,76 @@ export async function resumePausedUserTasks(
   return { resumed: ids.length, ids };
 }
 
+/** Disable a pending task so the processor skips it. Reuses paused_user so
+ *  the existing pause infrastructure (UI filter, resume flow) Just Works. */
+export async function disableTask(id: string): Promise<Task | null> {
+  const task = await getTask(id);
+  if (!task) return null;
+  if (task.status !== "pending" && task.status !== "paused_backpressure") return task;
+  await updateTask(task.id, { status: "paused_user" });
+  consoleLog("disabled", { taskId: id, pipelineId: task.pipelineId, phaseId: task.phaseId });
+  await logEvent("disabled", { taskId: id, pipelineId: task.pipelineId, phaseId: task.phaseId });
+  return await getTask(id);
+}
+
+/** Re-enable a manually-disabled task by flipping paused_user back to pending. */
+export async function enableTask(id: string): Promise<Task | null> {
+  const task = await getTask(id);
+  if (!task || task.status !== "paused_user") return task;
+  await updateTask(task.id, { status: "pending" });
+  consoleLog("enabled", { taskId: id, pipelineId: task.pipelineId, phaseId: task.phaseId });
+  await logEvent("enabled", { taskId: id, pipelineId: task.pipelineId, phaseId: task.phaseId });
+  return await getTask(id);
+}
+
+/** Re-run a deterministic gate that exhausted its retry budget.
+ *  Takes a task that's `needs_review` because the gate gave up after
+ *  retryPolicy.maxAttempts, flips it back to `pending` with retryCount=0
+ *  and gateFailReason cleared so the processor will run the gate again
+ *  with a fresh budget. Useful when the captain has manually edited the
+ *  upstream artifact (e.g. a draft file the slop gate reads) and wants to
+ *  re-check without going through the full regen path. The `attempts`
+ *  history is preserved so prior gate-fail reasons stay visible. */
+export async function rerunGate(id: string): Promise<Task | null> {
+  const task = await getTask(id);
+  if (!task) return null;
+  if (task.status !== "needs_review") return task;
+  if (!task.gateFailReason) return task; // not a gate-exhausted task — refuse
+
+  // Rewind to the previous phase. A deterministic gate checks an artifact
+  // produced upstream (e.g. slop-check checks drafts written by generate).
+  // Just re-running the gate against the same artifact deterministically
+  // fails the same way — and after onExhausted deletes failing artifacts,
+  // there's nothing left to check at all. Rewinding triggers a fresh
+  // upstream run, which then auto-advances back through the gate.
+  const pipeline = getPipeline(task.pipelineId);
+  const prev = pipeline ? previousPhase(pipeline, task.phaseId) : null;
+  const targetPhase = prev ?? task.phaseId;
+
+  await updateTask(task.id, {
+    status: "pending",
+    phaseId: targetPhase,
+    retryCount: 0,
+    gateFailReason: "",
+  });
+  // Drop the gate_fail attempts so the Failures panel doesn't keep showing
+  // this task as a problem after the captain explicitly retried it.
+  await clearFailureAttempts(task.id);
+  consoleLog("rerun_gate", {
+    taskId: id,
+    pipelineId: task.pipelineId,
+    fromPhase: task.phaseId,
+    toPhase: targetPhase,
+  });
+  await logEvent("rerun_gate", {
+    taskId: id,
+    pipelineId: task.pipelineId,
+    fromPhase: task.phaseId,
+    toPhase: targetPhase,
+  });
+  return await getTask(id);
+}
+
 /** Re-queue a failed task: flip status back to pending, clear the error,
  *  reset the retry counter so the phase's retryPolicy starts fresh. The
  *  `attempts` history is preserved so prior failures stay visible. */
@@ -348,15 +508,17 @@ export async function rerunTask(id: string): Promise<Task | null> {
     retryCount: 0,
     gateFailReason: "",
   });
+  await clearFailureAttempts(task.id);
   consoleLog("rerun", { taskId: id, pipelineId: task.pipelineId, phaseId: task.phaseId });
   await logEvent("rerun", { taskId: id, pipelineId: task.pipelineId, phaseId: task.phaseId });
   return await getTask(id);
 }
 
 export async function pipelineStatus(): Promise<
-  Array<{ id: string; phases: { id: string; gateType: string }[]; backpressureCap: number; counts: Record<string, number> }>
+  Array<{ id: string; phases: { id: string; gateType: string }[]; backpressureCap: number; enabled: boolean; counts: Record<string, number> }>
 > {
   const allTasks = await listTasks();
+  const enabledMap = await getAllPipelineEnabledMap();
   const byPipeline = new Map<string, Record<string, number>>();
   for (const t of allTasks) {
     let counts = byPipeline.get(t.pipelineId);
@@ -370,6 +532,7 @@ export async function pipelineStatus(): Promise<
     id: p.id,
     phases: p.phases.map((ph) => ({ id: ph.id, gateType: ph.gateType })),
     backpressureCap: p.backpressureCap ?? DEFAULT_BACKPRESSURE_CAP,
+    enabled: enabledMap[p.id] ?? true,
     counts: {
       needs_review: 0,
       pending: 0,

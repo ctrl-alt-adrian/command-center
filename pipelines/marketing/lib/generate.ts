@@ -4,7 +4,7 @@ import { CLI_DIR, DRAFTS_DIR } from "./paths.ts";
 import { SLUG_MAX_LENGTH } from "./constants.ts";
 import { getPlatformConfig } from "./config.ts";
 import { parseJsonArray, extractPromptFromMarkdown } from "./utils.ts";
-import { claude } from "../../../core/lib/claude.ts";
+import { claude, RateLimitError } from "../../../core/lib/claude.ts";
 import { logError } from "./errors.ts";
 import { loadWritePrompt } from "./writePrompt.ts";
 import { getLatestSignals, summarizeSignals } from "./signals.ts";
@@ -279,6 +279,16 @@ Write ONLY the post content. No commentary, no labels, no markdown code blocks.`
       return [platform, content] as const;
     })
   );
+
+  // If ANY platform hit a rate limit, propagate it so the processor can
+  // requeue the whole task back to pending — partial draft sets aren't useful
+  // and retrying mid-batch would just deepen the throttle.
+  const rateLimit = settled.find(
+    (r) => r.status === "rejected" && (r as PromiseRejectedResult).reason instanceof RateLimitError,
+  ) as PromiseRejectedResult | undefined;
+  if (rateLimit) {
+    throw rateLimit.reason;
+  }
 
   const failed: string[] = [];
   const results: Array<readonly [string, string]> = [];

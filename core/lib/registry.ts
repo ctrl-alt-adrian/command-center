@@ -28,6 +28,15 @@ export function nextPhase(
   return config.phases[idx + 1].id;
 }
 
+export function previousPhase(
+  config: PipelineConfig,
+  currentPhaseId: string,
+): string | null {
+  const idx = config.phases.findIndex((p) => p.id === currentPhaseId);
+  if (idx <= 0) return null;
+  return config.phases[idx - 1].id;
+}
+
 export function getPhase(config: PipelineConfig, phaseId: string) {
   return config.phases.find((p) => p.id === phaseId);
 }

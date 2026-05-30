@@ -84,7 +84,7 @@ export async function listTasksByPipeline(pipelineId: string): Promise<Task[]> {
 
 export async function updateTask(
   id: string,
-  updates: Partial<Pick<Task, "status" | "phaseId" | "output" | "error" | "retryCount" | "gateFailReason">>,
+  updates: Partial<Pick<Task, "status" | "phaseId" | "output" | "error" | "retryCount" | "gateFailReason" | "input">>,
 ): Promise<Task | null> {
   return withFileLock(taskFile(id), async () => {
     const task = await getTask(id);
@@ -110,6 +110,26 @@ export async function appendAttempt(id: string, attempt: TaskAttempt): Promise<v
 export async function deleteTask(id: string): Promise<void> {
   await fs.rm(taskDir(id), { recursive: true, force: true });
   tasksCache.bust();
+}
+
+/** Remove every `error` and `gate_fail` entry from the task's attempt log.
+ *  Successful `ok` entries are preserved so the audit trail for what actually
+ *  happened isn't lost. Used after rerun-style actions and by the bulk
+ *  "clear failures" button. */
+export async function clearFailureAttempts(id: string): Promise<number> {
+  return withFileLock(taskFile(id), async () => {
+    const task = await getTask(id);
+    if (!task) return 0;
+    const before = task.attempts.length;
+    task.attempts = task.attempts.filter((a) => a.outcome !== "error" && a.outcome !== "gate_fail");
+    const removed = before - task.attempts.length;
+    if (removed > 0) {
+      task.updatedAt = nowIso();
+      await fs.writeFile(taskFile(id), JSON.stringify(task, null, 2), "utf-8");
+      tasksCache.bust();
+    }
+    return removed;
+  });
 }
 
 export async function writePhaseOutput(

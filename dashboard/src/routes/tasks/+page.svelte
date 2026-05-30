@@ -6,7 +6,7 @@
   let filter = $state<"all" | "pending" | "needs_review" | "failed" | "completed" | "paused_backpressure" | "paused_user">("all");
 
   $effect(() => {
-    const id = setInterval(() => invalidateAll(), 5000);
+    const id = setInterval(() => invalidateAll(), 3000);
     return () => clearInterval(id);
   });
 
@@ -43,6 +43,14 @@
   }
   async function rerun(id: string) {
     await fetch(`/api/tasks/${id}/rerun`, { method: "POST" });
+    await invalidateAll();
+  }
+  async function disable(id: string) {
+    await fetch(`/api/tasks/${id}/disable`, { method: "POST" });
+    await invalidateAll();
+  }
+  async function enable(id: string) {
+    await fetch(`/api/tasks/${id}/enable`, { method: "POST" });
     await invalidateAll();
   }
   async function rerunFailed(pipelineId?: string) {
@@ -84,11 +92,75 @@
 
   const failedCount = $derived(data.tasks.filter((t) => t.status === "failed").length);
   const completedCount = $derived(data.tasks.filter((t) => t.status === "completed").length);
-  const needsReviewCount = $derived(data.tasks.filter((t) => t.status === "needs_review").length);
+  // Set of "pipelineId:phaseId" strings for deterministic gates. Tasks at
+  // these phases with gateFailReason can't be approved past — they need a
+  // gate rerun or rejection.
+  const deterministicPhases = $derived.by(() => {
+    const s = new Set<string>();
+    for (const p of data.pipelines) {
+      for (const ph of p.phases) if (ph.gateType === "deterministic") s.add(`${p.id}:${ph.id}`);
+    }
+    return s;
+  });
+  const isGateBlocked = (t: typeof data.tasks[number]) =>
+    t.status === "needs_review" && !!t.gateFailReason && deterministicPhases.has(`${t.pipelineId}:${t.phaseId}`);
+  const needsReviewCount = $derived(
+    data.tasks.filter((t) => t.status === "needs_review" && !isGateBlocked(t)).length,
+  );
+  const isSlopFailed = (t: typeof data.tasks[number]) =>
+    t.status === "needs_review" && t.phaseId === "slop-check" && !!t.gateFailReason;
+  const slopFailedTotal = $derived(data.tasks.filter(isSlopFailed).length);
+  const slopFailedByPipeline = $derived.by(() => {
+    const m: Record<string, number> = {};
+    for (const t of data.tasks) if (isSlopFailed(t)) m[t.pipelineId] = (m[t.pipelineId] ?? 0) + 1;
+    return m;
+  });
+  /** Per-pipeline → per-phase → {running, pending} in-flight breakdown.
+   *  Only phases with at least one in-flight task end up in the map so the
+   *  card renders nothing when everything's idle. */
+  const inFlightByPipelinePhase = $derived.by(() => {
+    const m: Record<string, Record<string, { running: number; pending: number }>> = {};
+    for (const t of data.tasks) {
+      if (t.status !== "running" && t.status !== "pending") continue;
+      const byPhase = m[t.pipelineId] ?? (m[t.pipelineId] = {});
+      const slot = byPhase[t.phaseId] ?? (byPhase[t.phaseId] = { running: 0, pending: 0 });
+      if (t.status === "running") slot.running++;
+      else slot.pending++;
+    }
+    return m;
+  });
   const removable = (s: string) => s === "failed" || s === "completed" || s === "cleared_stale";
 
   async function approveAll(pipelineId?: string) {
     await fetch("/api/tasks/approve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pipelineId }),
+    });
+    await invalidateAll();
+  }
+  async function togglePipeline(pipelineId: string, enabled: boolean) {
+    await fetch(`/api/pipelines/${pipelineId}/enabled`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    await invalidateAll();
+  }
+  async function rerunGate(id: string) {
+    await fetch(`/api/tasks/${id}/rerun-gate`, { method: "POST" });
+    await invalidateAll();
+  }
+  async function rerunSlopBulk(pipelineId?: string) {
+    await fetch("/api/tasks/rerun-gate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pipelineId, phaseId: "slop-check" }),
+    });
+    await invalidateAll();
+  }
+  async function clearFailures(pipelineId?: string) {
+    await fetch("/api/tasks/clear-failures", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pipelineId }),
@@ -104,6 +176,16 @@
       {#if needsReviewCount > 0}
         <button class="px-3 py-1.5 border border-warn/40 text-warn rounded hover:bg-warn/10 text-sm" onclick={() => approveAll()}>
           approve all ({needsReviewCount})
+        </button>
+      {/if}
+      {#if slopFailedTotal > 0}
+        <button class="px-3 py-1.5 border border-accent/40 text-accent rounded hover:bg-accent/10 text-sm" onclick={() => rerunSlopBulk()}>
+          rerun slop-check ({slopFailedTotal})
+        </button>
+      {/if}
+      {#if data.failures.length > 0}
+        <button class="px-3 py-1.5 border border-danger/40 text-danger rounded hover:bg-danger/10 text-sm" onclick={() => clearFailures()}>
+          clear failures ({data.failures.length})
         </button>
       {/if}
       {#if failedCount > 0}
@@ -155,11 +237,26 @@
     <h3 class="text-sm font-medium text-muted uppercase tracking-wider">Pipelines</h3>
     <div class="grid grid-cols-2 gap-3">
       {#each data.pipelines as p}
-        <div class="bg-card border border-border rounded p-3 text-sm hover:border-accent transition-colors">
-          <div class="flex items-baseline justify-between">
-            <a href={`/pipelines/${p.id}`} class="font-mono hover:text-accent">{p.id}</a>
+        <div class="bg-card border {p.enabled ? 'border-border' : 'border-warn/40'} rounded p-3 text-sm hover:border-accent transition-colors">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={p.enabled}
+                class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 {p.enabled ? 'bg-ok' : 'bg-muted/40'}"
+                onclick={() => togglePipeline(p.id, !p.enabled)}
+                title={p.enabled ? 'Disable — processor skips all tasks for this pipeline' : 'Enable — pipeline resumes processing'}
+              >
+                <span class="inline-block h-3 w-3 transform rounded-full bg-background transition-transform {p.enabled ? 'translate-x-5' : 'translate-x-1'}"></span>
+              </button>
+              <a href={`/pipelines/${p.id}`} class="font-mono hover:text-accent truncate {p.enabled ? '' : 'text-muted'}">{p.id}</a>
+              {#if !p.enabled}
+                <span class="text-xs text-warn shrink-0">disabled</span>
+              {/if}
+            </div>
             {#if p.counts.failed > 0}
-              <div class="flex gap-2 text-xs">
+              <div class="flex gap-2 text-xs shrink-0">
                 <button class="text-accent hover:underline" onclick={() => rerunFailed(p.id)}>
                   rerun failed ({p.counts.failed})
                 </button>
@@ -177,6 +274,32 @@
             <span class="text-danger">failed: {p.counts.failed}</span>
             <span class="text-warn">paused: {(p.counts.paused_backpressure ?? 0) + (p.counts.paused_user ?? 0)}</span>
           </div>
+          {#if inFlightByPipelinePhase[p.id]}
+            <div class="mt-2 pt-2 border-t border-border/40 text-xs text-muted">
+              <div class="text-[10px] uppercase tracking-wider text-muted/60 mb-1">in flight by phase</div>
+              <div class="flex flex-wrap gap-x-3 gap-y-1">
+                {#each p.phases as ph}
+                  {@const slot = inFlightByPipelinePhase[p.id]?.[ph.id]}
+                  {#if slot && (slot.running > 0 || slot.pending > 0)}
+                    <span class="font-mono">
+                      {ph.id}:
+                      {#if slot.running > 0}<span class="text-accent">{slot.running} running</span>{/if}
+                      {#if slot.running > 0 && slot.pending > 0}<span class="text-muted/50"> · </span>{/if}
+                      {#if slot.pending > 0}<span class="text-foreground">{slot.pending} pending</span>{/if}
+                    </span>
+                  {/if}
+                {/each}
+              </div>
+            </div>
+          {/if}
+          {#if (slopFailedByPipeline[p.id] ?? 0) > 0}
+            <div class="mt-2 flex items-center justify-between text-xs">
+              <span class="text-warn">{slopFailedByPipeline[p.id]} stuck at slop-check</span>
+              <button class="text-accent hover:underline" onclick={() => rerunSlopBulk(p.id)}>
+                rerun slop-check ({slopFailedByPipeline[p.id]})
+              </button>
+            </div>
+          {/if}
           {#if (p.counts.paused_user ?? 0) > 0}
             <div class="mt-2 flex items-center justify-between text-xs">
               <span class="text-warn">{p.counts.paused_user} held back from fan-out</span>
@@ -215,6 +338,7 @@
         <col class="w-32" />
         <col class="w-44" />
         <col class="w-20" />
+        <col class="w-20" />
         <col class="w-28" />
         <col />
       </colgroup>
@@ -225,6 +349,7 @@
           <th class="py-2 pr-4">phase</th>
           <th class="py-2 pr-4">status</th>
           <th class="py-2 pr-4">retries</th>
+          <th class="py-2 pr-4" title="Toggle to manually disable a pending task or re-enable a disabled one. Default: enabled.">enabled</th>
           <th class="py-2 pr-4">updated</th>
           <th class="py-2 pr-2"></th>
         </tr>
@@ -243,11 +368,33 @@
             <td class="py-2 pr-4 text-xs">{t.phaseId}</td>
             <td class="py-2 pr-4 whitespace-nowrap {STATUS_COLORS[t.status] ?? ''}">{t.status}</td>
             <td class="py-2 pr-4 text-xs">{t.retryCount ?? 0}</td>
+            <td class="py-2 pr-4">
+              {#if t.status === "pending" || t.status === "paused_backpressure" || t.status === "paused_user"}
+                {@const enabled = t.status !== "paused_user"}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={enabled}
+                  class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {enabled ? 'bg-ok' : 'bg-muted/40'}"
+                  onclick={() => (enabled ? disable(t.id) : enable(t.id))}
+                  title={enabled ? 'Disable — keep task out of the processor' : 'Enable — return task to pending queue'}
+                >
+                  <span class="inline-block h-3 w-3 transform rounded-full bg-background transition-transform {enabled ? 'translate-x-5' : 'translate-x-1'}"></span>
+                </button>
+              {:else}
+                <span class="text-xs text-muted/60">—</span>
+              {/if}
+            </td>
             <td class="py-2 pr-4 text-xs text-muted whitespace-nowrap">{new Date(t.updatedAt).toLocaleTimeString()}</td>
             <td class="py-2 pr-2 whitespace-nowrap">
               {#if t.status === "needs_review"}
-                <button class="text-ok text-xs mr-2" onclick={() => approve(t.id)}>approve</button>
-                <button class="text-danger text-xs mr-2" onclick={() => reject(t.id)}>reject</button>
+                {#if t.phaseId === "slop-check" && t.gateFailReason}
+                  <button class="text-accent text-xs mr-2" onclick={() => rerunGate(t.id)} title="Re-run the slop-check gate with a fresh retry budget — required before this task can advance">rerun slop</button>
+                  <button class="text-danger text-xs mr-2" onclick={() => reject(t.id)}>reject</button>
+                {:else}
+                  <button class="text-ok text-xs mr-2" onclick={() => approve(t.id)}>approve</button>
+                  <button class="text-danger text-xs mr-2" onclick={() => reject(t.id)}>reject</button>
+                {/if}
               {/if}
               {#if t.status === "failed"}
                 <button class="text-accent text-xs mr-2" onclick={() => rerun(t.id)}>rerun</button>

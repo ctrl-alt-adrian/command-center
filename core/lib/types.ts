@@ -34,6 +34,14 @@ export interface PhaseConfig {
    * Falls back to single-task advance when undefined.
    */
   fanOut?: (task: Task) => Promise<Array<Record<string, unknown>>>;
+  /**
+   * Optional hook fired when a deterministic gate exhausts its retry budget,
+   * just before the task transitions to needs_review. Lets the pipeline clean
+   * up artifacts (e.g. delete failing draft files) so they can't be mistaken
+   * for usable output. Errors are caught and logged — the transition still
+   * happens regardless.
+   */
+  onExhausted?: (task: Task, reason: string) => Promise<void>;
 }
 
 export interface PhaseOutput {
@@ -99,4 +107,4 @@ export interface Task {
 export const DEFAULT_BACKPRESSURE_CAP = 5;
 export const DEFAULT_RETRY_MAX = 3;
 export const DEFAULT_TIMEOUT_MS = 120_000;
-export const DEFAULT_PROCESSOR_PER_TICK_CAP = 3;
+export const DEFAULT_PROCESSOR_PER_TICK_CAP = 10;

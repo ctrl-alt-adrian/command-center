@@ -100,6 +100,18 @@ export async function deleteDraftSet(date: string): Promise<void> {
   await fs.rm(dirPath, { recursive: true, force: true });
 }
 
+/** Remove a single platform's draft (the .md file) and drop its status entry.
+ *  Used by the slop-check exhaustion handler so failing drafts don't sit on
+ *  disk as if they were publishable posts. The set itself is preserved when
+ *  other platforms passed; only emptied-out sets get fully removed. */
+export async function deleteDraftPlatform(date: string, platform: string): Promise<void> {
+  const dirPath = path.join(DRAFTS_DIR, date);
+  await fs.rm(path.join(dirPath, `${platform}.md`), { force: true });
+  const statuses = await readStatusFile(dirPath);
+  delete statuses[platform];
+  await writeStatusFile(dirPath, statuses);
+}
+
 export async function updateDraftStatus(
   date: string,
   platform: string,
