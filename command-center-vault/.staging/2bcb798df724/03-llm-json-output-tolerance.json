@@ -1,0 +1,23 @@
+{
+  "title": "LLM JSON Output Tolerance",
+  "pillar": "engineering",
+  "tier": 1,
+  "content_ready": true,
+  "tags": [
+    "llm",
+    "json",
+    "parsing",
+    "error-handling"
+  ],
+  "aliases": [
+    "decoder-over-unmarshal"
+  ],
+  "summary": "Use json.Decoder.Decode instead of json.Unmarshal to tolerate trailing content in LLM responses; add stripJSONCodeFence helper for markdown-wrapped output.",
+  "body": "LLM responses often contain trailing content (markdown fences, notes after JSON). Parsing with `json.Unmarshal` fails hard; switching to `json.Decoder.Decode` allows trailing content. Add a `stripJSONCodeFence` helper to handle markdown-wrapped responses. Combine with `dec.More()` logging to catch truncation. The fix converted a 100%-failure rate on detailed resumes to 0 failures once the upstream token cap was corrected. Implemented in PR #219.",
+  "related": [
+    "Token Truncation as Silent Failure",
+    "Live-Log Debugging Pipeline"
+  ],
+  "sourceId": "2026-05-14_post-redesign-fixes-and-ats-proposal",
+  "sourcePath": "/home/adrian/Documents/rolenext/sessions/2026-05-14_post-redesign-fixes-and-ats-proposal.md"
+}

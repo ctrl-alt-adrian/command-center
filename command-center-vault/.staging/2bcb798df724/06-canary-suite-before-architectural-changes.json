@@ -1,0 +1,23 @@
+{
+  "title": "Canary Suite Before Architectural Changes",
+  "pillar": "intuition",
+  "tier": 1,
+  "content_ready": true,
+  "tags": [
+    "gating",
+    "regression",
+    "architecture",
+    "rolenext"
+  ],
+  "aliases": [
+    "baseline-before-rewrites"
+  ],
+  "summary": "Establish a regression baseline (canary suite) before undertaking large architectural changes; it gates confidence to proceed.",
+  "body": "Establish a regression baseline (canary suite v1) before undertaking large ATS architectural changes (domain gating, heuristic pre-screening, enrichment, judges). The suite catches regressions early and gives confidence to proceed with structural rewrites. In RoleNext, the canary suite was identified as the highest-leverage next task after word-boundary filtering (PR #218), gating the broader judges and domain-gating work. The principle applies across any refactor that touches core business logic: measure twice, cut once.",
+  "related": [
+    "OpenSpec for Structural Rewrites",
+    "Live-Log Debugging Pipeline"
+  ],
+  "sourceId": "2026-05-14_post-redesign-fixes-and-ats-proposal",
+  "sourcePath": "/home/adrian/Documents/rolenext/sessions/2026-05-14_post-redesign-fixes-and-ats-proposal.md"
+}

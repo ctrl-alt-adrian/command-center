@@ -1,0 +1,22 @@
+{
+  "title": "Live-Log Debugging Pipeline",
+  "pillar": "engineering",
+  "tier": 1,
+  "content_ready": true,
+  "tags": [
+    "debugging",
+    "observability",
+    "rolenext"
+  ],
+  "aliases": [
+    "grep-filtered-backend-logs"
+  ],
+  "summary": "Run backend + frontend as background processes, monitor backend logs with grep filters, execute real workflows to surface root causes in one session.",
+  "body": "Set up a backend + frontend dev environment with a persistent monitor task filtering backend logs to `[analyze]|[expandedSearch]|[ats]|...` patterns, then ran actual searches in the browser. Real logs surfaced multiple root causes in one session: substring matching bugs, JSON parsing failures, and token-cap truncation. This pattern is high-leverage for debugging production-like issues without instrumentation or trace collection. Applied in RoleNext to debug post-redesign stability issues in the search pipeline.",
+  "related": [
+    "Token Truncation as Silent Failure",
+    "LLM JSON Output Tolerance"
+  ],
+  "sourceId": "2026-05-14_post-redesign-fixes-and-ats-proposal",
+  "sourcePath": "/home/adrian/Documents/rolenext/sessions/2026-05-14_post-redesign-fixes-and-ats-proposal.md"
+}

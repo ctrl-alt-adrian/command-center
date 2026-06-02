@@ -1,0 +1,23 @@
+{
+  "title": "OpenSpec for Structural Rewrites",
+  "pillar": "harness",
+  "tier": 1,
+  "content_ready": true,
+  "tags": [
+    "openspec",
+    "planning",
+    "architecture",
+    "workflow"
+  ],
+  "aliases": [
+    "structured-architectural-planning"
+  ],
+  "summary": "Use OpenSpec workflow to capture principles, decisions, specs, and task sequencing for large multi-phase architectural changes.",
+  "body": "Use the OpenSpec workflow to capture architectural direction for large multi-phase changes. Write a proposal (principles), design (decisions with alternatives and risks), specs (requirements and scenarios), and tasks (phases with dependencies). For RoleNext's ATS source quality rewrite, this produced 11 task groups and clarified the dependency chain: word-boundary fix (shipped as PR #218), canary baseline, then larger changes. The structure prevents scope creep, surfaces open questions upfront, and enables team alignment on architectural principles before implementation begins.",
+  "related": [
+    "Canary Suite Before Architectural Changes",
+    "Live-Log Debugging Pipeline"
+  ],
+  "sourceId": "2026-05-14_post-redesign-fixes-and-ats-proposal",
+  "sourcePath": "/home/adrian/Documents/rolenext/sessions/2026-05-14_post-redesign-fixes-and-ats-proposal.md"
+}

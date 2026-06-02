@@ -1,0 +1,22 @@
+{
+  "title": "Don't Expose Pre-Filter Counts",
+  "pillar": "engineering",
+  "tier": 2,
+  "content_ready": true,
+  "tags": [
+    "ui",
+    "backpressure",
+    "filtering",
+    "signals"
+  ],
+  "aliases": [
+    "intermediate-state-leakage"
+  ],
+  "summary": "Hide raw scrape counts from the UI while filtering is in progress; they create false signals about result size.",
+  "body": "The SourcesPanel was showing `source_progress.scanned` (raw scrape totals) while the pipeline was still filtering jobs, creating a false signal: '1500 jobs found' when the actual result set was far smaller. Hide these raw counts on `scanning` and `queued` rows. Preserve activity signal via progress bars and latest-scanned-title. The fix prevents users from misinterpreting intermediate scrape state as final result size. Implemented in PR #220 alongside the max_tokens fix.",
+  "related": [
+    "Canary Suite Before Architectural Changes"
+  ],
+  "sourceId": "2026-05-14_post-redesign-fixes-and-ats-proposal",
+  "sourcePath": "/home/adrian/Documents/rolenext/sessions/2026-05-14_post-redesign-fixes-and-ats-proposal.md"
+}

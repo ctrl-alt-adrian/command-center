@@ -1,0 +1,23 @@
+{
+  "title": "Word-Boundary ATS Filtering",
+  "pillar": "engineering",
+  "tier": 2,
+  "content_ready": true,
+  "tags": [
+    "ats",
+    "search",
+    "filtering",
+    "rolenext"
+  ],
+  "aliases": [
+    "substring-matching-false-positives"
+  ],
+  "summary": "Substring ATS title matching causes false positives (care matches Healthcare, data matches Datadog); word-boundary filtering eliminates them.",
+  "body": "The ATS title filter was matching substrings instead of word boundaries, causing 'care' to match 'Healthcare' and 'data' to match 'Datadog' in job searches. Switching from substring to word-boundary matching via an existing `containsWord` helper eliminated false positives. The bug surfaced in live debugging with real search queries, confirming the fix works: a 'charge nurse' search then produced 10 strong matches instead of noise. Implemented as PR #218.",
+  "related": [
+    "Live-Log Debugging Pipeline",
+    "Canary Suite Before Architectural Changes"
+  ],
+  "sourceId": "2026-05-14_post-redesign-fixes-and-ats-proposal",
+  "sourcePath": "/home/adrian/Documents/rolenext/sessions/2026-05-14_post-redesign-fixes-and-ats-proposal.md"
+}

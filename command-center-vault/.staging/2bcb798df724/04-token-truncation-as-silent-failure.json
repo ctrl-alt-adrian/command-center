@@ -1,0 +1,23 @@
+{
+  "title": "Token Truncation as Silent Failure",
+  "pillar": "engineering",
+  "tier": 2,
+  "content_ready": true,
+  "tags": [
+    "llm",
+    "tokens",
+    "failure-modes",
+    "observability"
+  ],
+  "aliases": [
+    "max-tokens-truncation"
+  ],
+  "summary": "When an LLM call hits the token cap, the response is truncated mid-JSON, surfacing as a parse error until output tolerance is fixed.",
+  "body": "When an LLM call hits the token cap, the response gets truncated mid-JSON. This looks like a parse error ('invalid character \",\" after top-level value') until you fix the parser to tolerate trailing content. The real issue then surfaces: the `maxTokens` parameter was at default (1.5-2k) instead of the required 8192. Fix the parser tolerance first to expose the actual problem, then increase capacity. In RoleNext S1, nursing-resume searches failed on every call; the fix cascaded: first parse tolerance, then token cap adjustment to 8192, then real results.",
+  "related": [
+    "LLM JSON Output Tolerance",
+    "Live-Log Debugging Pipeline"
+  ],
+  "sourceId": "2026-05-14_post-redesign-fixes-and-ats-proposal",
+  "sourcePath": "/home/adrian/Documents/rolenext/sessions/2026-05-14_post-redesign-fixes-and-ats-proposal.md"
+}
