@@ -25,6 +25,9 @@ logs/*
 vault/*
 !vault/.gitkeep
 !vault/README.md
+# Developer handbook lives in the KB but is version-controlled (onboarding docs)
+!vault/developer-handbook/
+!vault/developer-handbook/**
 
 # Marketing pipeline runtime
 pipelines/marketing/config.json
